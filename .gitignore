@@ -1,0 +1,6 @@
+/.idea/
+/.next/
+/.vinext/
+/.wrangler/
+/dist/
+/node_modules/
