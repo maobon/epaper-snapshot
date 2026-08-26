@@ -25,6 +25,8 @@ pnpm install --frozen-lockfile
 pnpm build
 ```
 
+项目已将 pnpm 的单次下载超时提高到 10 分钟，并增加到 5 次重试，以适应云主机下载约 42 MB 的 Next.js Linux SWC 包。如果安装曾因网络超时中断，直接重新执行上面的安装命令即可。
+
 ## 3. 启动生产服务
 
 ```bash
