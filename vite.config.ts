@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { sites } from '@openai/sites-vite-plugin';
 import tailwindcss from '@tailwindcss/postcss';
 import vinext from 'vinext';
@@ -5,6 +6,7 @@ import { defineConfig } from 'vite';
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
+const hasSitesHostingConfig = existsSync(new URL('./.openai/hosting.json', import.meta.url));
 
 const localBindingConfig = {
   main: 'vinext/server/app-router-entry',
@@ -28,7 +30,7 @@ export default defineConfig(async () => {
       : undefined,
     plugins: [
       vinext(),
-      sites(),
+      ...(hasSitesHostingConfig ? [sites()] : []),
       cloudflare({
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
         config: localBindingConfig,

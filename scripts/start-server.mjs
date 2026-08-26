@@ -9,11 +9,16 @@ const VINEXT_PATH = join(SITE_DIR, 'node_modules', '.bin', 'vinext');
 const SNAPSHOT_SCRIPT = join(SCRIPT_DIR, 'export-hourly-snapshots.mjs');
 const MODE = process.argv[2];
 const PORT = process.env.PORT || '3001';
-const BASE_URL = process.env.EPAPER_BASE_URL || `http://localhost:${PORT}`;
+const HOST = process.env.EPAPER_HOST || '0.0.0.0';
+const BASE_URL = process.env.EPAPER_BASE_URL || `http://127.0.0.1:${PORT}`;
 const READY_TIMEOUT_MS = 60_000;
 
 if (MODE !== 'dev' && MODE !== 'start') {
   throw new Error('Usage: node scripts/start-server.mjs <dev|start>');
+}
+
+if (!/^\d+$/.test(PORT) || Number(PORT) < 1 || Number(PORT) > 65535) {
+  throw new Error(`Invalid PORT: ${PORT}`);
 }
 
 async function siteIsReady() {
@@ -56,9 +61,10 @@ async function refreshAllScreensAfterStartup(server) {
 }
 
 await access(VINEXT_PATH);
-const server = spawn(VINEXT_PATH, [MODE], {
+console.log(`Starting ${MODE} server at http://${HOST}:${PORT}`);
+const server = spawn(VINEXT_PATH, [MODE, '--port', PORT, '--hostname', HOST], {
   cwd: SITE_DIR,
-  env: process.env,
+  env: { ...process.env, PORT },
   stdio: 'inherit',
 });
 

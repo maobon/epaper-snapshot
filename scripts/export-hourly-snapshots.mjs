@@ -2,21 +2,37 @@ import { spawn } from 'node:child_process';
 import { constants } from 'node:fs';
 import { access, mkdir, mkdtemp, open, readFile, rename, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = dirname(SCRIPT_DIR);
 const SNAPSHOT_DIR = join(SITE_DIR, 'snapshot');
 const LOCK_FILE = join(SNAPSHOT_DIR, '.hourly-export.lock');
-const BASE_URL = process.env.EPAPER_BASE_URL || 'http://localhost:3000';
-const PNPM_PATH = process.env.EPAPER_PNPM_PATH || '/opt/homebrew/bin/pnpm';
-const CHROME_CANDIDATES = [
+const PORT = process.env.PORT || '3001';
+const BASE_URL = process.env.EPAPER_BASE_URL || `http://127.0.0.1:${PORT}`;
+const PATH_DIRS = (process.env.PATH || '').split(delimiter).filter(Boolean);
+const CHROME_NAMES = ['google-chrome-stable', 'google-chrome', 'chromium', 'chromium-browser'];
+const CHROME_CANDIDATES = [...new Set([
   process.env.EPAPER_CHROME_PATH,
+  process.env.CHROME_PATH,
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
   '/Applications/Chromium.app/Contents/MacOS/Chromium',
-].filter(Boolean);
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/snap/bin/chromium',
+  ...PATH_DIRS.flatMap((directory) => CHROME_NAMES.map((name) => join(directory, name))),
+].filter(Boolean))];
+const PNPM_CANDIDATES = [...new Set([
+  process.env.EPAPER_PNPM_PATH,
+  '/opt/homebrew/bin/pnpm',
+  '/usr/local/bin/pnpm',
+  '/usr/bin/pnpm',
+  ...PATH_DIRS.map((directory) => join(directory, 'pnpm')),
+].filter(Boolean))];
 
 const PAGES = [
   { name: 'currency', route: '/currency', width: 800, height: 480, marker: 'USD to CNH Chart' },
@@ -29,16 +45,27 @@ function hourKey(date = new Date()) {
   return date.toISOString().slice(0, 13).replaceAll(/[-T:]/g, '');
 }
 
-async function findChrome() {
-  for (const candidate of CHROME_CANDIDATES) {
+async function findExecutable(candidates, errorMessage) {
+  for (const candidate of candidates) {
     try {
       await access(candidate, constants.X_OK);
       return candidate;
     } catch {
-      // Try the next supported local browser path.
+      // Try the next supported executable path.
     }
   }
-  throw new Error('Chrome was not found. Set EPAPER_CHROME_PATH to its executable.');
+  throw new Error(errorMessage);
+}
+
+async function findChrome() {
+  return findExecutable(
+    CHROME_CANDIDATES,
+    'Chrome was not found. Install Chrome/Chromium or set EPAPER_CHROME_PATH to its executable.',
+  );
+}
+
+async function findPnpm() {
+  return findExecutable(PNPM_CANDIDATES, 'pnpm was not found. Set EPAPER_PNPM_PATH to its executable.');
 }
 
 async function expectedSiteIsReady() {
@@ -62,11 +89,13 @@ async function waitForSite(timeoutMs = 30_000) {
 
 async function startSiteIfNeeded() {
   if (await expectedSiteIsReady()) return undefined;
-  await access(PNPM_PATH, constants.X_OK);
-  const child = spawn(PNPM_PATH, ['dev'], {
+  const pnpmPath = await findPnpm();
+  const baseUrl = new URL(BASE_URL);
+  const port = baseUrl.port || (baseUrl.protocol === 'https:' ? '443' : '80');
+  const child = spawn(pnpmPath, ['dev'], {
     cwd: SITE_DIR,
     detached: true,
-    env: { ...process.env, PORT: '3000' },
+    env: { ...process.env, PORT: port, EPAPER_BASE_URL: BASE_URL },
     stdio: 'ignore',
   });
   child.unref();
@@ -91,11 +120,15 @@ async function verifyPng(path, width, height) {
 }
 
 async function capturePage(chromePath, profileDir, temporaryPath, page, targetUrl) {
-  const child = spawn(chromePath, [
+  const chromeArgs = [
     '--headless=new',
     '--disable-gpu',
     '--disable-extensions',
     '--disable-background-networking',
+    ...(process.platform === 'linux' ? ['--disable-dev-shm-usage'] : []),
+    ...(typeof process.getuid === 'function' && process.getuid() === 0
+      ? ['--no-sandbox', '--disable-setuid-sandbox']
+      : []),
     '--hide-scrollbars',
     '--no-first-run',
     '--run-all-compositor-stages-before-draw',
@@ -105,10 +138,20 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
     `--user-data-dir=${profileDir}`,
     `--screenshot=${temporaryPath}`,
     targetUrl,
-  ], { cwd: SITE_DIR, detached: true, stdio: 'ignore' });
+  ];
+  const child = spawn(chromePath, chromeArgs, {
+    cwd: SITE_DIR,
+    detached: true,
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
 
   let processError;
   let processExit;
+  let chromeStderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk) => {
+    chromeStderr = `${chromeStderr}${chunk}`.slice(-16_384);
+  });
   child.once('error', (error) => { processError = error; });
   child.once('exit', (code, signal) => { processExit = { code, signal }; });
 
@@ -130,7 +173,10 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
       } catch (error) {
         if (error?.code !== 'ENOENT') throw error;
       }
-      if (processExit && processExit.code !== 0) throw new Error(`Chrome exited with ${processExit.code ?? processExit.signal}`);
+      if (processExit && processExit.code !== 0) {
+        const detail = chromeStderr.trim();
+        throw new Error(`Chrome exited with ${processExit.code ?? processExit.signal}${detail ? `:\n${detail}` : ''}`);
+      }
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     throw new Error(`Chrome did not finish ${page.route} within 25 seconds`);
@@ -185,6 +231,10 @@ async function main() {
   try {
     await lock.writeFile(`${new Date().toISOString()}\n`);
     const chromePath = await findChrome();
+    console.log(`Using Chrome executable: ${chromePath}`);
+    if (typeof process.getuid === 'function' && process.getuid() === 0) {
+      console.warn('Running Chrome as root; sandbox is disabled for the snapshot process. Prefer a non-root service user in production.');
+    }
     managedServer = await startSiteIfNeeded();
     const refreshKey = hourKey();
     const exported = [];

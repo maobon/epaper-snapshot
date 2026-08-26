@@ -4,5 +4,7 @@
 /.wrangler/
 /dist/
 /node_modules/
+.env
+!.env.example
 /site/snapshot/hourly-export.log
 /site/snapshot/hourly-export-error.log

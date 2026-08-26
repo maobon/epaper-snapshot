@@ -7,11 +7,11 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "node scripts/start-server.mjs dev",
+    "dev": "node --env-file-if-exists=.env scripts/start-server.mjs dev",
     "build": "vinext build",
-    "start": "node scripts/start-server.mjs start",
+    "start": "node --env-file-if-exists=.env scripts/start-server.mjs start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "snapshots:export": "node scripts/export-hourly-snapshots.mjs"
+    "snapshots:export": "node --env-file-if-exists=.env scripts/export-hourly-snapshots.mjs"
   },
   "dependencies": {
     "@cf-wasm/png": "0.4.0",
