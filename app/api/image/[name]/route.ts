@@ -4,7 +4,7 @@ export const revalidate = 3600;
 
 const allowed = new Set<EpaperImageName>(['currency', 'landscape', 'portrait', 'forecast-15d']);
 
-export async function GET(request: Request, context: { params: Promise<{ name: string }> }) {
+export async function GET(_request: Request, context: { params: Promise<{ name: string }> }) {
   const { name: rawName } = await context.params;
   const name = rawName.replace(/\.png$/i, '') as EpaperImageName;
   if (!allowed.has(name)) {
@@ -12,8 +12,9 @@ export async function GET(request: Request, context: { params: Promise<{ name: s
   }
 
   try {
-    const image = await generateEpaperImage(name, request.url);
-    return new Response(image.png, {
+    const image = await generateEpaperImage(name);
+    const responseBody = Uint8Array.from(image.png).buffer;
+    return new Response(responseBody, {
       headers: {
         ...imageCacheHeaders(`${name}.png`),
         'Content-Type': 'image/png',

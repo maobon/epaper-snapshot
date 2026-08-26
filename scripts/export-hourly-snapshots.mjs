@@ -26,14 +26,6 @@ const CHROME_CANDIDATES = [...new Set([
   '/snap/bin/chromium',
   ...PATH_DIRS.flatMap((directory) => CHROME_NAMES.map((name) => join(directory, name))),
 ].filter(Boolean))];
-const PNPM_CANDIDATES = [...new Set([
-  process.env.EPAPER_PNPM_PATH,
-  '/opt/homebrew/bin/pnpm',
-  '/usr/local/bin/pnpm',
-  '/usr/bin/pnpm',
-  ...PATH_DIRS.map((directory) => join(directory, 'pnpm')),
-].filter(Boolean))];
-
 const PAGES = [
   { name: 'currency', route: '/currency', width: 800, height: 480, marker: 'USD to CNH Chart' },
   { name: 'landscape', route: '/landscape', width: 800, height: 480, marker: 'Beijing' },
@@ -64,10 +56,6 @@ async function findChrome() {
   );
 }
 
-async function findPnpm() {
-  return findExecutable(PNPM_CANDIDATES, 'pnpm was not found. Set EPAPER_PNPM_PATH to its executable.');
-}
-
 async function expectedSiteIsReady() {
   try {
     const response = await fetch(`${BASE_URL}/currency?snapshotProbe=${Date.now()}`, { cache: 'no-store' });
@@ -75,36 +63,6 @@ async function expectedSiteIsReady() {
     return (await response.text()).includes('USD to CNH Chart');
   } catch {
     return false;
-  }
-}
-
-async function waitForSite(timeoutMs = 30_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await expectedSiteIsReady()) return;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  throw new Error(`The site did not become ready at ${BASE_URL}`);
-}
-
-async function startSiteIfNeeded() {
-  if (await expectedSiteIsReady()) return undefined;
-  const pnpmPath = await findPnpm();
-  const baseUrl = new URL(BASE_URL);
-  const port = baseUrl.port || (baseUrl.protocol === 'https:' ? '443' : '80');
-  const child = spawn(pnpmPath, ['dev'], {
-    cwd: SITE_DIR,
-    detached: true,
-    env: { ...process.env, PORT: port, EPAPER_BASE_URL: BASE_URL },
-    stdio: 'ignore',
-  });
-  child.unref();
-  try {
-    await waitForSite();
-    return child;
-  } catch (error) {
-    if (child.pid) process.kill(-child.pid, 'SIGTERM');
-    throw error;
   }
 }
 
@@ -227,23 +185,21 @@ async function main() {
     return;
   }
 
-  let managedServer;
   try {
     await lock.writeFile(`${new Date().toISOString()}\n`);
+    if (!(await expectedSiteIsReady())) {
+      throw new Error(`The production site is not available at ${BASE_URL}. Start it before running the scheduled export.`);
+    }
     const chromePath = await findChrome();
     console.log(`Using Chrome executable: ${chromePath}`);
     if (typeof process.getuid === 'function' && process.getuid() === 0) {
       console.warn('Running Chrome as root; sandbox is disabled for the snapshot process. Prefer a non-root service user in production.');
     }
-    managedServer = await startSiteIfNeeded();
     const refreshKey = hourKey();
     const exported = [];
     for (const page of PAGES) exported.push(await exportPage(chromePath, page, refreshKey));
     console.log(`[${new Date().toISOString()}] Exported ${exported.length} front-end images for hour ${refreshKey}.`);
   } finally {
-    if (managedServer?.pid) {
-      try { process.kill(-managedServer.pid, 'SIGTERM'); } catch { /* server already stopped */ }
-    }
     await lock.close();
     await rm(LOCK_FILE, { force: true });
   }

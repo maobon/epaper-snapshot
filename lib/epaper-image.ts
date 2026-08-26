@@ -1,7 +1,7 @@
-import { BitDepth, ColorType, decode, encode } from '@cf-wasm/png/workerd';
-import { Resvg } from '@cf-wasm/resvg/workerd';
-import regularFontUrl from '@fontsource/inter/files/inter-latin-400-normal.woff2?url';
-import boldFontUrl from '@fontsource/inter/files/inter-latin-700-normal.woff2?url';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { BitDepth, ColorType, decode, encode } from '@cf-wasm/png/node';
+import { Resvg } from '@cf-wasm/resvg/node';
 import { fetchMonthlyUsdCnh, type ExchangeRatePoint } from '@/lib/exchange-rate-api';
 import { fetchDailyWeather, fetchDaysWeather, fetchHourlyWeather } from '@/lib/weather-api';
 import { getWeatherPresentation, type WeatherKind } from '@/lib/weather-presentation';
@@ -80,17 +80,17 @@ function dateLabel(date: string, withYear = false) {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
-async function loadFontBuffers(requestUrl: string) {
-  fontBuffersPromise ??= Promise.all([regularFontUrl, boldFontUrl].map(async (assetUrl) => {
-    const response = await fetch(new URL(assetUrl, requestUrl));
-    if (!response.ok) throw new Error(`Unable to load image font: ${response.status}`);
-    return new Uint8Array(await response.arrayBuffer());
-  }));
+async function loadFontBuffers() {
+  const fontDirectory = join(process.cwd(), 'node_modules', '@fontsource', 'inter', 'files');
+  fontBuffersPromise ??= Promise.all([
+    'inter-latin-400-normal.woff2',
+    'inter-latin-700-normal.woff2',
+  ].map(async (fileName) => new Uint8Array(await readFile(join(fontDirectory, fileName)))));
   return fontBuffersPromise;
 }
 
-async function svgToFourGrayPng(svg: string, requestUrl: string) {
-  const fontBuffers = await loadFontBuffers(requestUrl);
+async function svgToFourGrayPng(svg: string) {
+  const fontBuffers = await loadFontBuffers();
   const renderer = await Resvg.async(svg, {
     background: WHITE,
     font: { fontBuffers, loadSystemFonts: false, defaultFontFamily: 'Inter' },
@@ -366,9 +366,9 @@ async function forecast15Svg() {
   return svgDocument(480, 800, body);
 }
 
-export async function generateEpaperImage(name: EpaperImageName, requestUrl: string) {
+export async function generateEpaperImage(name: EpaperImageName) {
   const svg = name === 'currency' ? await currencySvg() : name === 'landscape' ? await landscapeSvg() : name === 'portrait' ? await portraitSvg() : await forecast15Svg();
-  const png = await svgToFourGrayPng(svg, requestUrl);
+  const png = await svgToFourGrayPng(svg);
   return { png, svg, ...EPAPER_IMAGE_SPECS[name] };
 }
 
