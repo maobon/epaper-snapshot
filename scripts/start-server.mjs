@@ -8,7 +8,7 @@ const SITE_DIR = dirname(SCRIPT_DIR);
 const VINEXT_PATH = join(SITE_DIR, 'node_modules', '.bin', 'vinext');
 const SNAPSHOT_SCRIPT = join(SCRIPT_DIR, 'export-hourly-snapshots.mjs');
 const MODE = process.argv[2];
-const PORT = process.env.PORT || '3000';
+const PORT = process.env.PORT || '3001';
 const BASE_URL = process.env.EPAPER_BASE_URL || `http://localhost:${PORT}`;
 const READY_TIMEOUT_MS = 60_000;
 
