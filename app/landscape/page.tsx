@@ -146,7 +146,7 @@ async function getDashboard(): Promise<Dashboard> {
     }));
 
     return {
-      city: 'Beijing',
+      city: data.cityInfo?.localizedName ?? data.cityInfo?.englishName ?? data.cityInfo?.name ?? fallback.city,
       dateLabel: formatCurrentTime(data.currentTime),
       current: {
         temp: data.actual.temperature ?? fallback.current.temp,

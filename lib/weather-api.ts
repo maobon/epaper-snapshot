@@ -1,6 +1,5 @@
 const WEATHER_API_BASE_URL = 'https://h5-api.zuimeitianqi.com/h5en/api/';
 const WEATHER_PAGE_ORIGIN = 'https://samsung-h5.zuimeitianqi.com/';
-const WEATHER_CACHE_SECONDS = 3600;
 
 const commonParams = {
   lan: 'en-us',
@@ -12,15 +11,11 @@ const commonParams = {
 type WeatherEndpoint = 'hw-daily' | 'hw-days' | 'hw-hourly';
 type WeatherEnvelope<T> = { data?: T };
 
-function currentUpdateTime() {
-  return Math.floor(Date.now() / (WEATHER_CACHE_SECONDS * 1000)) * WEATHER_CACHE_SECONDS * 1000;
-}
-
 async function fetchWeatherData<T>(endpointName: WeatherEndpoint): Promise<T> {
   const endpoint = new URL(endpointName, WEATHER_API_BASE_URL);
   endpoint.search = new URLSearchParams({
     ...commonParams,
-    updateTime: String(currentUpdateTime()),
+    updateTime: String(Date.now()),
   }).toString();
 
   const response = await fetch(endpoint, {
@@ -28,7 +23,7 @@ async function fetchWeatherData<T>(endpointName: WeatherEndpoint): Promise<T> {
       Accept: 'application/json',
       Referer: WEATHER_PAGE_ORIGIN,
     },
-    next: { revalidate: WEATHER_CACHE_SECONDS },
+    cache: 'no-store',
   });
 
   if (!response.ok) {

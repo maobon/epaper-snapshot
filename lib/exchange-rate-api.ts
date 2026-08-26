@@ -1,5 +1,4 @@
 const FRANKFURTER_RATES_URL = 'https://api.frankfurter.dev/v2/rates';
-const CACHE_SECONDS = 3600;
 const RANGE_DAYS = 30;
 
 type FrankfurterRate = {
@@ -23,10 +22,6 @@ function formatDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function currentCacheHour() {
-  return String(Math.floor(Date.now() / (CACHE_SECONDS * 1000)));
-}
-
 export async function fetchMonthlyUsdCnh(): Promise<ExchangeRateSeries> {
   const endDate = new Date();
   const startDate = new Date(endDate);
@@ -43,9 +38,8 @@ export async function fetchMonthlyUsdCnh(): Promise<ExchangeRateSeries> {
   const response = await fetch(endpoint, {
     headers: {
       Accept: 'application/json',
-      'X-Cache-Hour': currentCacheHour(),
     },
-    next: { revalidate: CACHE_SECONDS },
+    cache: 'no-store',
   });
   if (!response.ok) throw new Error(`Frankfurter returned ${response.status}`);
 

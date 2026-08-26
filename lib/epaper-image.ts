@@ -4,7 +4,7 @@ import { BitDepth, ColorType, decode, encode } from '@cf-wasm/png/node';
 import { Resvg } from '@cf-wasm/resvg/node';
 import { fetchMonthlyUsdCnh, type ExchangeRatePoint } from '@/lib/exchange-rate-api';
 import { fetchDailyWeather, fetchDaysWeather, fetchHourlyWeather } from '@/lib/weather-api';
-import { getWeatherPresentation, type WeatherKind } from '@/lib/weather-presentation';
+import { getWeatherPresentation, type WeatherDisplayKind, type WeatherKind } from '@/lib/weather-presentation';
 
 export type EpaperImageName = 'currency' | 'landscape' | 'portrait' | 'forecast-15d';
 
@@ -19,7 +19,6 @@ const BLACK = '#000000';
 const DARK = '#555555';
 const LIGHT = '#aaaaaa';
 const WHITE = '#ffffff';
-const CACHE_SECONDS = 3600;
 
 let fontBuffersPromise: Promise<Uint8Array[]> | undefined;
 
@@ -58,13 +57,15 @@ function svgDocument(width: number, height: number, body: string) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="${WHITE}"/>${body}</svg>`;
 }
 
-function weatherIcon(kind: WeatherKind, x: number, y: number, size: number, color = DARK) {
+function weatherIcon(kind: WeatherDisplayKind, x: number, y: number, size: number, color = DARK) {
   const scale = size / 48;
   const cloud = `<path d="M10 30 C10 23 15 19 21 19 C23 12 29 9 35 12 C40 14 42 19 41 23 C46 24 48 28 47 33 C46 38 42 40 37 40 H18 C13 40 10 36 10 30 Z" fill="${WHITE}" stroke="${color}" stroke-width="2.4"/>`;
   const sun = `<circle cx="25" cy="24" r="8" fill="${WHITE}" stroke="${color}" stroke-width="2.4"/><g stroke="${color}" stroke-width="2"><line x1="25" y1="7" x2="25" y2="12"/><line x1="25" y1="36" x2="25" y2="41"/><line x1="8" y1="24" x2="13" y2="24"/><line x1="37" y1="24" x2="42" y2="24"/><line x1="13" y1="12" x2="17" y2="16"/><line x1="33" y1="32" x2="37" y2="36"/><line x1="37" y1="12" x2="33" y2="16"/><line x1="17" y1="32" x2="13" y2="36"/></g>`;
   let drawing = cloud;
   if (kind === 'sunny') drawing = sun;
   if (kind === 'partly') drawing = `<circle cx="17" cy="17" r="7" fill="${WHITE}" stroke="${color}" stroke-width="2"/>${cloud}`;
+  if (kind === 'night-clear') drawing = `<path d="M34 9 C22 12 17 27 25 37 C29 42 36 43 42 40 C36 48 22 48 15 38 C7 27 12 11 24 6 C28 5 31 6 34 9 Z" fill="${WHITE}" stroke="${color}" stroke-width="2.4"/>`;
+  if (kind === 'partly-small') drawing = `<path d="M29 8 C20 11 17 22 23 29 C26 33 31 34 36 32 C31 39 20 39 15 31 C9 22 13 11 22 7 C25 6 27 7 29 8 Z" fill="${WHITE}" stroke="${color}" stroke-width="2"/>${cloud}`;
   if (kind === 'rain') drawing = `${cloud}<g stroke="${color}" stroke-width="2"><line x1="18" y1="42" x2="15" y2="47"/><line x1="29" y1="42" x2="26" y2="47"/><line x1="40" y1="42" x2="37" y2="47"/></g>`;
   if (kind === 'storm') drawing = `${cloud}<path d="M28 39 L23 47 H29 L25 54 L37 43 H31 L35 39 Z" fill="${color}"/>`;
   if (kind === 'snow') drawing = `${cloud}<g fill="${color}"><circle cx="18" cy="45" r="1.8"/><circle cx="29" cy="45" r="1.8"/><circle cx="40" cy="45" r="1.8"/></g>`;
@@ -214,7 +215,7 @@ async function getLandscapeData(): Promise<LandscapeData> {
     const timeParts = source.currentTime?.split(' ') ?? [];
     const weekday = timeParts[0] ? new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${timeParts[0]}T12:00:00Z`)).toUpperCase() : 'NOW';
     return {
-      city: 'Beijing',
+      city: source.cityInfo?.localizedName ?? source.cityInfo?.englishName ?? fallbackLandscape.city,
       time: `${weekday} · ${(timeParts[1] ?? '00:00').slice(0, 5)}`,
       current: { temp: source.actual.temperature ?? 0, condition: currentPresentation.label, kind: currentPresentation.kind, rain: hours[0]?.rainprobability ?? 0, humidity: source.actual.humidity ?? hours[0]?.humidity ?? 0, wind: source.actual.windspeed ?? hours[0]?.ws ?? 0 },
       hourly: hours.map((hour, index) => ({ time: index === 0 ? 'Now' : hour.time?.slice(11, 16) ?? `${String(index).padStart(2, '0')}:00`, temp: hour.temp ?? 0 })),
@@ -260,14 +261,14 @@ async function landscapeSvg() {
 
 type PortraitDay = { date: string; day: string; high: number; low: number; kind: WeatherKind; condition: string; wind: string; level: number };
 type PortraitData = {
-  city: string; date: string; day: { temp: number; kind: WeatherKind; condition: string; wind: number; feels: number; visibility: number; uv: string; cloud: number }; night: { temp: number; kind: WeatherKind; condition: string; wind: number };
+  city: string; date: string; windUnit: string; distanceUnit: string; day: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gust: number; feels: number; visibility: number; uv: string; cloud: number }; night: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gust: number };
   aqi: Array<{ time: string; value: number }>; life: string[]; forecast: PortraitDay[];
 };
 
 const fallbackPortrait: PortraitData = {
-  city: 'Chaoyang District', date: '08/26 WED',
-  day: { temp: 27, kind: 'cloudy', condition: 'Cloudy', wind: 7, feels: 31, visibility: 10, uv: 'Low', cloud: 95 },
-  night: { temp: 21, kind: 'partly', condition: 'Partly cloudy', wind: 9 },
+  city: 'Chaoyang District', date: '08/26 WED', windUnit: 'km/h', distanceUnit: 'km',
+  day: { temp: 27, kind: 'cloudy', condition: 'Cloudy', wind: 7, gust: 2, feels: 31, visibility: 10, uv: 'Low', cloud: 95 },
+  night: { temp: 21, kind: 'partly-small', condition: 'Partly cloudy', wind: 9, gust: 2 },
   aqi: Array.from({ length: 13 }, (_, index) => ({ time: String(index).padStart(2, '0'), value: 20 + index * 2 })),
   life: ['Dressing · Short sleeve', 'Car wash · Not suitable', 'Sports · Suitable', 'Colds · Easier'],
   forecast: [
@@ -277,28 +278,45 @@ const fallbackPortrait: PortraitData = {
 };
 
 async function getPortraitData(): Promise<PortraitData> {
-  type Condition = { cloudCover?: number; winddir?: string; windspeed?: number; weaName?: string; weaIcon?: string };
+  type Condition = { cloudCover?: number; winddir?: string; windspeed?: number; windlevel?: number; windGustPow?: number; weaName?: string; weaIcon?: string };
   type Day = { publicDate: string; maxtemp?: number; mintemp?: number; realFeelTempMax?: number; visibility?: number; uvIndex?: number; dayWeaName?: string; nightWeaName?: string; conditionDay?: Condition; conditionNight?: Condition };
-  type Source = { currentTime?: string; cityInfo?: { localizedName?: string; englishName?: string }; forecastList?: { dailyWeathers?: Day[] }; aqiHourly?: Array<{ time?: string; aqi?: number }> };
+  type LifeIndex = { code?: string; levelList?: Array<{ day?: string; level?: string }> };
+  type Source = { currentTime?: string; cityInfo?: { localizedName?: string; englishName?: string }; windSpeedUnit?: string; disUnit?: string; forecastList?: { dailyWeathers?: Day[] }; lifeIndex?: LifeIndex[] };
+  type HourlySource = {
+    actual?: { temperature?: number; realfeel?: number; visibility?: number; cloudCover?: number; uvindex?: number; windspeed?: number; windgustlevel?: number; weaName?: string; weaIcon?: string };
+    hourly?: Array<{ time?: string; aqi?: number; isdaynight?: boolean }>;
+  };
   try {
-    const source = await fetchDailyWeather<Source>();
+    const [source, hourlySource] = await Promise.all([fetchDailyWeather<Source>(), fetchHourlyWeather<HourlySource>()]);
     const days = source.forecastList?.dailyWeathers ?? [], currentDate = source.currentTime ?? '';
     const currentIndex = days.findIndex((day) => day.publicDate === currentDate), current = days[currentIndex];
-    if (!current) return fallbackPortrait;
-    const dayPresentation = getWeatherPresentation(current.dayWeaName, current.conditionDay?.weaIcon), nightPresentation = getWeatherPresentation(current.nightWeaName, current.conditionNight?.weaIcon);
+    if (!current || !hourlySource.actual) return fallbackPortrait;
+    const currentHour = hourlySource.hourly?.[0];
+    const dayPresentation = getWeatherPresentation(hourlySource.actual.weaName, hourlySource.actual.weaIcon, currentHour?.isdaynight ?? true);
+    const nightPresentation = getWeatherPresentation(current.nightWeaName, current.conditionNight?.weaIcon, false);
     const forecast = days.slice(Math.max(0, currentIndex - 1), Math.max(0, currentIndex - 1) + 7).map((day, index) => {
       const presentation = getWeatherPresentation(day.dayWeaName, day.conditionDay?.weaIcon);
       const parsed = new Date(`${day.publicDate}T12:00:00Z`), mmdd = `${String(parsed.getUTCMonth() + 1).padStart(2, '0')}/${String(parsed.getUTCDate()).padStart(2, '0')}`;
-      return { date: mmdd, day: index === 0 ? 'Yesterday' : index === 1 ? 'Today' : new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(parsed), high: day.maxtemp ?? 0, low: day.mintemp ?? 0, kind: presentation.kind, condition: presentation.label, wind: day.conditionDay?.winddir ?? '—', level: 2 };
+      return { date: mmdd, day: index === 0 ? 'Yesterday' : index === 1 ? 'Today' : new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(parsed), high: day.maxtemp ?? 0, low: day.mintemp ?? 0, kind: presentation.kind, condition: presentation.label, wind: day.conditionDay?.winddir ?? '—', level: day.conditionDay?.windlevel ?? 0 };
     });
     if (forecast.length < 7) return fallbackPortrait;
     const parsed = new Date(`${currentDate}T12:00:00Z`), displayDate = `${String(parsed.getUTCMonth() + 1).padStart(2, '0')}/${String(parsed.getUTCDate()).padStart(2, '0')} ${new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(parsed).toUpperCase()}`;
+    const lifeLevel = (code: string) => source.lifeIndex?.find((item) => item.code === code)?.levelList?.find((item) => item.day === currentDate)?.level;
+    const translateLife = (code: string, value?: string) => {
+      const labels: Record<string, Record<string, string>> = {
+        '2': { '短袖': 'Short sleeve', '长袖': 'Long sleeve', '薄外套': 'Light jacket' },
+        '4': { '不宜': 'Not suitable', '较不宜': 'Less suitable', '适宜': 'Suitable', '较适宜': 'Suitable' },
+        '5': { '不宜': 'Not suitable', '较不宜': 'Not suitable', '适宜': 'Suitable', '较适宜': 'Suitable' },
+        '3': { '极易': 'Very easy', '较易': 'Easier', '易发': 'Likely', '少发': 'Unlikely', '不易': 'Unlikely' },
+      };
+      return (value && labels[code]?.[value]) || value || '—';
+    };
     return {
-      city: source.cityInfo?.localizedName ?? source.cityInfo?.englishName ?? fallbackPortrait.city, date: displayDate,
-      day: { temp: current.maxtemp ?? 0, kind: dayPresentation.kind, condition: dayPresentation.label, wind: current.conditionDay?.windspeed ?? 0, feels: current.realFeelTempMax ?? 0, visibility: current.visibility ?? 0, uv: (current.uvIndex ?? 0) <= 2 ? 'Low' : (current.uvIndex ?? 0) <= 5 ? 'Moderate' : 'High', cloud: current.conditionDay?.cloudCover ?? 0 },
-      night: { temp: current.mintemp ?? 0, kind: nightPresentation.kind, condition: nightPresentation.label, wind: current.conditionNight?.windspeed ?? 0 },
-      aqi: (source.aqiHourly ?? []).slice(0, 13).map((item, index) => ({ time: item.time?.slice(-5, -3) ?? String(index).padStart(2, '0'), value: item.aqi ?? 0 })),
-      life: fallbackPortrait.life, forecast,
+      city: source.cityInfo?.localizedName ?? source.cityInfo?.englishName ?? fallbackPortrait.city, date: displayDate, windUnit: source.windSpeedUnit ?? fallbackPortrait.windUnit, distanceUnit: source.disUnit ?? fallbackPortrait.distanceUnit,
+      day: { temp: hourlySource.actual.temperature ?? 0, kind: dayPresentation.kind, condition: dayPresentation.label, wind: hourlySource.actual.windspeed ?? 0, gust: hourlySource.actual.windgustlevel ?? 0, feels: hourlySource.actual.realfeel ?? 0, visibility: hourlySource.actual.visibility ?? 0, uv: (hourlySource.actual.uvindex ?? 0) <= 2 ? 'Low' : (hourlySource.actual.uvindex ?? 0) <= 5 ? 'Moderate' : 'High', cloud: hourlySource.actual.cloudCover ?? 0 },
+      night: { temp: current.mintemp ?? 0, kind: nightPresentation.kind, condition: nightPresentation.label, wind: current.conditionNight?.windspeed ?? 0, gust: current.conditionNight?.windGustPow ?? 0 },
+      aqi: (hourlySource.hourly ?? []).slice(0, 13).map((item, index) => ({ time: item.time?.slice(11, 13) ?? String(index).padStart(2, '0'), value: item.aqi ?? 0 })),
+      life: [`Dressing · ${translateLife('2', lifeLevel('2'))}`, `Car wash · ${translateLife('4', lifeLevel('4'))}`, `Sports · ${translateLife('5', lifeLevel('5'))}`, `Colds · ${translateLife('3', lifeLevel('3'))}`], forecast,
     };
   } catch { return fallbackPortrait; }
 }
@@ -310,14 +328,14 @@ function sectionTitle(y: number, title: string, note?: string) {
 async function portraitSvg() {
   const data = await getPortraitData();
   let body = rect(1, 1, 478, 798, 0, BLACK, WHITE, 2);
-  body += rect(10, 10, 460, 184, 14, DARK, WHITE, 2) + text(20, 34, 'DAY', 14, 700) + text(460, 34, `${data.city.toUpperCase()} · ${data.date}`, 11, 700, { anchor: 'end', fill: DARK });
+  body += rect(10, 10, 460, 184, 14, DARK, WHITE, 2) + text(20, 34, 'CURRENT', 14, 700) + text(460, 34, `${data.city.toUpperCase()} · ${data.date}`, 11, 700, { anchor: 'end', fill: DARK });
   body += text(20, 106, data.day.temp, 68, 700) + text(91, 65, '°', 26, 700) + weatherIcon(data.day.kind, 201, 47, 48, DARK) + text(225, 111, data.day.condition.toUpperCase(), 12, 700, { anchor: 'middle' });
-  body += text(358, 70, `Wind ${data.day.wind} km/h`, 13, 700) + text(358, 94, 'Gust · Level 3', 13, 700);
+  body += text(358, 70, `Wind ${data.day.wind} ${data.windUnit}`, 13, 700) + text(358, 94, `Gust · Level ${data.day.gust}`, 13, 700);
   body += line(20, 122, 460, 122, LIGHT, 1);
-  const detail = [['FEELS LIKE', `${data.day.feels}°`], ['VISIBILITY', `${data.day.visibility} km`], ['UV INDEX', data.day.uv], ['CLOUD', `${data.day.cloud}%`]];
+  const detail = [['FEELS LIKE', `${data.day.feels}°`], ['VISIBILITY', `${data.day.visibility} ${data.distanceUnit}`], ['UV INDEX', data.day.uv], ['CLOUD', `${data.day.cloud}%`]];
   detail.forEach(([label, value], index) => { const x = 20 + index * 110; if (index) body += line(x, 130, x, 184, LIGHT, 1); body += text(x + 10, 153, label, 9, 700, { fill: DARK, spacing: 0.5 }) + text(x + 10, 177, value, 14, 700); });
   body += rect(10, 201, 460, 96, 14, DARK, WHITE, 2) + sectionTitle(225, 'NIGHT', '18:00 — 06:00');
-  body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 170, 235, 38, DARK) + text(216, 265, data.night.condition.toUpperCase(), 10, 700) + text(358, 253, `Wind ${data.night.wind} km/h`, 13, 700) + text(358, 277, 'Gust · Level 3', 13, 700);
+  body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 170, 235, 38, DARK) + text(216, 265, data.night.condition.toUpperCase(), 10, 700) + text(358, 253, `Wind ${data.night.wind} ${data.windUnit}`, 13, 700) + text(358, 277, `Gust · Level ${data.night.gust}`, 13, 700);
   body += rect(10, 304, 460, 123, 14, DARK, WHITE, 2) + sectionTitle(328, 'HOURLY AQI FORECAST', 'LIVE') + line(20, 410, 460, 410, LIGHT, 1);
   const aqi = data.aqi.length >= 13 ? data.aqi.slice(0, 13) : fallbackPortrait.aqi;
   aqi.forEach((item, index) => { const x = 40 + index * 33; const height = Math.max(14, Math.min(45, item.value * 0.45)); body += `<rect x="${x - 4}" y="${402 - height}" width="8" height="${height}" rx="3" fill="${index === 0 ? DARK : LIGHT}"/>` + text(x, 420, item.time, 9, 700, { anchor: 'middle', fill: DARK }); });
@@ -374,7 +392,7 @@ export async function generateEpaperImage(name: EpaperImageName) {
 
 export function imageCacheHeaders(fileName: string) {
   return {
-    'Cache-Control': `public, max-age=0, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=60`,
+    'Cache-Control': 'no-store',
     'Content-Disposition': `inline; filename="${fileName}"`,
     'X-Content-Type-Options': 'nosniff',
   };

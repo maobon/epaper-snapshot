@@ -5,15 +5,17 @@ import { CloudIcon } from '@phosphor-icons/react/dist/ssr/Cloud';
 import { CloudLightningIcon } from '@phosphor-icons/react/dist/ssr/CloudLightning';
 import { CloudRainIcon } from '@phosphor-icons/react/dist/ssr/CloudRain';
 import { CloudSnowIcon } from '@phosphor-icons/react/dist/ssr/CloudSnow';
+import { CloudMoonIcon } from '@phosphor-icons/react/dist/ssr/CloudMoon';
 import { CloudSunIcon } from '@phosphor-icons/react/dist/ssr/CloudSun';
 import { EyeIcon } from '@phosphor-icons/react/dist/ssr/Eye';
 import { PillIcon } from '@phosphor-icons/react/dist/ssr/Pill';
+import { MoonStarsIcon } from '@phosphor-icons/react/dist/ssr/MoonStars';
 import { SunIcon } from '@phosphor-icons/react/dist/ssr/Sun';
 import { ThermometerSimpleIcon } from '@phosphor-icons/react/dist/ssr/ThermometerSimple';
 import { TShirtIcon } from '@phosphor-icons/react/dist/ssr/TShirt';
 import { WindIcon } from '@phosphor-icons/react/dist/ssr/Wind';
-import { fetchDailyWeather } from '@/lib/weather-api';
-import { getWeatherPresentation, type WeatherKind } from '@/lib/weather-presentation';
+import { fetchDailyWeather, fetchHourlyWeather } from '@/lib/weather-api';
+import { getWeatherPresentation, type WeatherDisplayKind, type WeatherKind } from '@/lib/weather-presentation';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,12 +37,26 @@ type SourceData = {
   aqiHourly?: Array<{ time?: string; aqi?: number; lv?: number }>;
   lifeIndex?: Array<{ code?: string; levelList?: Array<{ day?: string; level?: string }> }>;
 };
+type HourlyData = {
+  actual?: {
+    temperature?: number;
+    realfeel?: number;
+    visibility?: number;
+    cloudCover?: number;
+    uvindex?: number;
+    windspeed?: number;
+    windgustlevel?: number;
+    weaName?: string;
+    weaIcon?: string;
+  };
+  hourly?: Array<{ time?: string; aqi?: number; isdaynight?: boolean }>;
+};
 type ForecastDay = { date: string; day: string; condition: string; high: number; low: number; wind: string; level: number; kind: WeatherKind };
 type Dashboard = {
   city: string;
   dateLabel: string;
-  day: { temp: number; kind: WeatherKind; condition: string; wind: number; gustLevel: number; feels: number; visibility: number; uv: string; cloud: number };
-  night: { temp: number; kind: WeatherKind; condition: string; wind: number; gustLevel: number };
+  day: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gustLevel: number; feels: number; visibility: number; uv: string; cloud: number };
+  night: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gustLevel: number };
   distanceUnit: string;
   windUnit: string;
   hourly: Array<{ time: string; value: number; level: number }>;
@@ -65,7 +81,7 @@ const fallback: Dashboard = {
   life: { dressing: 'Short sleeve', carWash: 'Not suitable', sports: 'Not suitable', colds: 'Easier' },
   forecast: fallbackForecast,
 };
-const forecastIcons = { rain: CloudRainIcon, storm: CloudLightningIcon, snow: CloudSnowIcon, partly: CloudSunIcon, cloudy: CloudIcon, sunny: SunIcon };
+const weatherIcons = { rain: CloudRainIcon, storm: CloudLightningIcon, snow: CloudSnowIcon, partly: CloudSunIcon, cloudy: CloudIcon, sunny: SunIcon, 'night-clear': MoonStarsIcon, 'partly-small': CloudMoonIcon };
 
 function uvLabel(value = 0) { return value <= 2 ? 'Low' : value <= 5 ? 'Moderate' : value <= 7 ? 'High' : value <= 10 ? 'Very high' : 'Extreme'; }
 function aqiLabel(value: number) { return value <= 50 ? 'EXCELLENT' : value <= 100 ? 'GOOD' : value <= 150 ? 'LIGHT' : 'POLLUTED'; }
@@ -87,14 +103,19 @@ function formatDate(date: string, relative?: 'today' | 'yesterday') {
 
 async function getDashboard(): Promise<Dashboard> {
   try {
-    const data = await fetchDailyWeather<SourceData>();
+    const [data, hourlyData] = await Promise.all([
+      fetchDailyWeather<SourceData>(),
+      fetchHourlyWeather<HourlyData>(),
+    ]);
     if (!data?.currentTime) throw new Error('Weather source omitted the current date');
+    if (!hourlyData?.actual) throw new Error('Weather source omitted current conditions');
     const days = data.forecastList?.dailyWeathers ?? [];
     const currentIndex = days.findIndex((item) => item.publicDate === data.currentTime);
     const current = currentIndex >= 0 ? days[currentIndex] : undefined;
     if (!current) throw new Error('Weather source omitted the current forecast');
-    const dayWeather = getWeatherPresentation(current.dayWeaName, current.conditionDay?.weaIcon);
-    const nightWeather = getWeatherPresentation(current.nightWeaName, current.conditionNight?.weaIcon);
+    const currentHour = hourlyData.hourly?.[0];
+    const dayWeather = getWeatherPresentation(hourlyData.actual.weaName, hourlyData.actual.weaIcon, currentHour?.isdaynight ?? true);
+    const nightWeather = getWeatherPresentation(current.nightWeaName, current.conditionNight?.weaIcon, false);
     const currentDate = formatDate(data.currentTime, 'today');
     const sevenDays = days.slice(Math.max(0, currentIndex - 1), Math.max(0, currentIndex - 1) + 7).map((item, index) => {
       const presentation = getWeatherPresentation(item.dayWeaName, item.conditionDay?.weaIcon);
@@ -105,11 +126,14 @@ async function getDashboard(): Promise<Dashboard> {
     return {
       city: data.cityInfo?.localizedName ?? data.cityInfo?.englishName ?? data.cityInfo?.name ?? fallback.city,
       dateLabel: `${currentDate.mmdd} ${currentDate.weekday.toUpperCase()}`,
-      day: { temp: current.maxtemp ?? fallback.day.temp, kind: dayWeather.kind, condition: dayWeather.label, wind: current.conditionDay?.windspeed ?? fallback.day.wind, gustLevel: current.conditionDay?.windGustPow ?? fallback.day.gustLevel, feels: current.realFeelTempMax ?? fallback.day.feels, visibility: current.visibility ?? fallback.day.visibility, uv: uvLabel(current.uvIndex), cloud: current.conditionDay?.cloudCover ?? fallback.day.cloud },
+      day: { temp: hourlyData.actual.temperature ?? fallback.day.temp, kind: dayWeather.kind, condition: dayWeather.label, wind: hourlyData.actual.windspeed ?? fallback.day.wind, gustLevel: hourlyData.actual.windgustlevel ?? fallback.day.gustLevel, feels: hourlyData.actual.realfeel ?? fallback.day.feels, visibility: hourlyData.actual.visibility ?? fallback.day.visibility, uv: uvLabel(hourlyData.actual.uvindex), cloud: hourlyData.actual.cloudCover ?? fallback.day.cloud },
       night: { temp: current.mintemp ?? fallback.night.temp, kind: nightWeather.kind, condition: nightWeather.label, wind: current.conditionNight?.windspeed ?? fallback.night.wind, gustLevel: current.conditionNight?.windGustPow ?? fallback.night.gustLevel },
       distanceUnit: data.disUnit ?? fallback.distanceUnit,
       windUnit: data.windSpeedUnit ?? fallback.windUnit,
-      hourly: (data.aqiHourly ?? []).slice(0, 13).map((item, index) => ({ time: item.time?.slice(-5, -3) ?? String(index).padStart(2, '0'), value: item.aqi ?? 0, level: item.lv ?? 1 })),
+      hourly: (hourlyData.hourly ?? []).slice(0, 13).map((item, index) => {
+        const value = item.aqi ?? 0;
+        return { time: item.time?.slice(11, 13) ?? String(index).padStart(2, '0'), value, level: value <= 50 ? 1 : value <= 100 ? 2 : 3 };
+      }),
       life: { dressing: translateLife('2', lifeValue('2')), carWash: translateLife('4', lifeValue('4')), sports: translateLife('5', lifeValue('5')), colds: translateLife('3', lifeValue('3')) },
       forecast: sevenDays.length === 7 ? sevenDays : fallback.forecast,
     };
@@ -128,15 +152,15 @@ function TemperatureLine({ points, color }: { points: Array<{ x: number; y: numb
 
 export default async function PortraitWeather() {
   const dashboard = await getDashboard();
-  const DayIcon = forecastIcons[dashboard.day.kind], NightIcon = forecastIcons[dashboard.night.kind];
+  const DayIcon = weatherIcons[dashboard.day.kind], NightIcon = weatherIcons[dashboard.night.kind];
   const highPoints = seriesPoints(dashboard.forecast.map((item) => item.high), 14, 30);
   const lowPoints = seriesPoints(dashboard.forecast.map((item) => item.low), 50, 68);
   const hourly = dashboard.hourly.length === 13 ? dashboard.hourly : fallback.hourly;
   return (
     <main className="portrait-stage grid min-h-screen min-w-[480px] place-items-center bg-white font-sans text-black">
       <section className="epaper-portrait flex h-[800px] w-[480px] flex-col gap-1.5 overflow-hidden rounded-none border-2 border-black bg-white p-2" aria-label={`Portrait ${dashboard.city} weather dashboard`}>
-        <section className="h-[184px] shrink-0 overflow-hidden rounded-2xl border border-[#555] bg-white p-2" aria-label="Day weather">
-          <header className="flex h-5 items-center justify-between text-xs font-semibold"><h1 className="tracking-wide">DAY</h1><p className="text-[10px] text-[#555]">{dashboard.city.toUpperCase()} · {dashboard.dateLabel}</p></header>
+        <section className="h-[184px] shrink-0 overflow-hidden rounded-2xl border border-[#555] bg-white p-2" aria-label="Current weather">
+          <header className="flex h-5 items-center justify-between text-xs font-semibold"><h1 className="tracking-wide">CURRENT</h1><p className="text-[10px] text-[#555]">{dashboard.city.toUpperCase()} · {dashboard.dateLabel}</p></header>
           <div className="grid h-[82px] grid-cols-[120px_minmax(0,1fr)_150px] items-center gap-2">
             <div className="flex items-start"><strong className="text-[70px] leading-[.86] tracking-[-4px]">{dashboard.day.temp}</strong><span className="ml-1 text-[28px] leading-none">°</span></div>
             <div className="flex flex-col items-center justify-self-center"><DayIcon color="#555" size={43} weight="light" /><span className="mt-0.5 text-center text-[11px] leading-none font-semibold uppercase">{dashboard.day.condition}</span></div>
@@ -163,7 +187,7 @@ export default async function PortraitWeather() {
         </section>
         <section className="h-[234px] shrink-0 overflow-hidden rounded-2xl border border-[#555] bg-white p-2" aria-label="Seven day weather forecast">
           <header className="flex h-5 items-center justify-between"><h2 className="text-sm font-semibold">7-DAY FORECAST</h2><span className="text-xs text-[#555]">LIVE</span></header>
-          <div className="mt-1 grid h-[82px] grid-cols-7">{dashboard.forecast.map((item) => { const Icon = forecastIcons[item.kind]; return <article className="flex min-w-0 flex-col items-center text-center" key={item.date}><p className="text-[9px] text-[#555]">{item.date}</p><h3 className="text-[10px] font-semibold">{item.day}</h3><Icon color="#555" size={26} weight="light" aria-hidden="true" /><p className="w-full truncate px-0.5 text-[9px]">{item.condition}</p></article>; })}</div>
+          <div className="mt-1 grid h-[82px] grid-cols-7">{dashboard.forecast.map((item) => { const Icon = weatherIcons[item.kind]; return <article className="flex min-w-0 flex-col items-center text-center" key={item.date}><p className="text-[9px] text-[#555]">{item.date}</p><h3 className="text-[10px] font-semibold">{item.day}</h3><Icon color="#555" size={26} weight="light" aria-hidden="true" /><p className="w-full truncate px-0.5 text-[9px]">{item.condition}</p></article>; })}</div>
           <div className="relative h-[72px]"><TemperatureLine color="#000" points={highPoints} /><TemperatureLine color="#aaa" points={lowPoints} />{dashboard.forecast.map((item, index) => <div className="absolute top-0 flex h-[72px] w-[52px] -translate-x-1/2 flex-col justify-between text-center text-[10px] font-semibold" key={`temperature-${item.date}`} style={{ left: highPoints[index].x }}><span>{item.high}°</span><span className="text-[#555]">{item.low}°</span></div>)}</div>
           <div className="grid h-[45px] grid-cols-7">{dashboard.forecast.map((item) => <div className="flex flex-col items-center text-[9px]" key={`wind-${item.date}`}><span>{item.wind}</span><span>{item.level} Level</span></div>)}</div>
         </section>

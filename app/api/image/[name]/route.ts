@@ -1,6 +1,7 @@
 import { EPAPER_IMAGE_SPECS, generateEpaperImage, imageCacheHeaders, type EpaperImageName } from '@/lib/epaper-image';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const allowed = new Set<EpaperImageName>(['currency', 'landscape', 'portrait', 'forecast-15d']);
 
