@@ -20,7 +20,7 @@ const CHROME_CANDIDATES = [
 
 const PAGES = [
   { name: 'currency', route: '/currency', width: 800, height: 480, marker: 'USD to CNH Chart' },
-  { name: 'landscape', route: '/landscape', width: 800, height: 480, marker: 'Chaoyang District' },
+  { name: 'landscape', route: '/landscape', width: 800, height: 480, marker: 'Beijing' },
   { name: 'portrait', route: '/portrait', width: 480, height: 800, marker: 'HOURLY AQI FORECAST' },
   { name: 'forecast-15d', route: '/forecast-15d', width: 480, height: 800, marker: '15-DAY FORECAST' },
 ];

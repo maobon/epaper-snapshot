@@ -7,9 +7,9 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
+    "dev": "node scripts/start-server.mjs dev",
     "build": "vinext build",
-    "start": "vinext start",
+    "start": "node scripts/start-server.mjs start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "snapshots:export": "node scripts/export-hourly-snapshots.mjs"
   },

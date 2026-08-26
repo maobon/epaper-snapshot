@@ -13,16 +13,16 @@ import { getWeatherPresentation, type WeatherDisplayKind } from '@/lib/weather-p
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Chaoyang District Weather',
+  title: 'Beijing Weather',
   description: 'A live 800 by 480 pixel four-level grayscale weather dashboard for e-paper displays.',
   openGraph: {
-    title: 'Chaoyang District Weather',
+    title: 'Beijing Weather',
     description: 'Live 800 × 480 weather dashboard for e-paper displays.',
     images: [],
   },
   twitter: {
     card: 'summary',
-    title: 'Chaoyang District Weather',
+    title: 'Beijing Weather',
     description: 'Live 800 × 480 weather dashboard for e-paper displays.',
     images: [],
   },
@@ -84,7 +84,7 @@ const fallbackForecast: ForecastDay[] = [
   { day: 'Tue', high: 29, low: 19, kind: 'sunny' },
 ];
 const fallback: Dashboard = {
-  city: 'Chaoyang District',
+  city: 'Beijing',
   dateLabel: 'TUE · 22:25',
   current: { temp: 22, kind: 'partly-small', condition: 'Partly cloudy', rain: 9, humidity: 92, wind: 10 },
   hourly: fallbackHourly,
@@ -146,7 +146,7 @@ async function getDashboard(): Promise<Dashboard> {
     }));
 
     return {
-      city: data.cityInfo?.localizedName ?? data.cityInfo?.englishName ?? data.cityInfo?.name ?? fallback.city,
+      city: 'Beijing',
       dateLabel: formatCurrentTime(data.currentTime),
       current: {
         temp: data.actual.temperature ?? fallback.current.temp,
@@ -189,6 +189,7 @@ export default async function LandscapeWeather() {
   const dashboard = await getDashboard();
   const CurrentIcon = weatherIcons[dashboard.current.kind];
   const chartPoints = makeChartPoints(dashboard.hourly);
+  const highestTemperature = Math.max(...dashboard.hourly.map((item) => item.temp));
   const areaPoints = ['0 100%', ...chartPoints.map(({ x, y }) => `${x}px ${y}px`), '746px 100%'].join(', ');
   const labelIndices = [0, 3, 6, 9, 12, 15, 18, 21].filter((index) => index < dashboard.hourly.length);
 
@@ -196,8 +197,7 @@ export default async function LandscapeWeather() {
     <main className="screen-stage grid min-h-screen min-w-[800px] place-items-center bg-white font-sans text-black">
       <section className="epaper-landscape h-[480px] w-[800px] overflow-hidden rounded-none border-2 border-black bg-white p-3" aria-label={`${dashboard.city} weather dashboard`}>
         <header className="flex h-8 items-center justify-between">
-          <div className="flex items-center gap-2 rounded-full border border-[#555] bg-white px-3 py-1 text-sm font-semibold tracking-wide">
-            <span className="pin" aria-hidden="true" />
+          <div className="flex items-center rounded-full border border-[#555] bg-white px-3 py-1 text-sm font-semibold tracking-wide">
             {dashboard.city}
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wide">
@@ -230,7 +230,7 @@ export default async function LandscapeWeather() {
             <h2 className="text-sm font-semibold tracking-tight">Next 24 hours</h2>
             <span className="rounded-md bg-black px-2 py-0.5 text-[10px] font-semibold text-white">TEMPERATURE</span>
           </div>
-          <div className="relative h-[82px] w-[746px] overflow-hidden border-b border-[#aaa]">
+          <div className="relative h-[82px] w-[746px] overflow-visible border-b border-[#aaa]">
             <div className="chart-area" style={{ clipPath: `polygon(${areaPoints})` }} />
             {chartPoints.slice(0, -1).map((point, index) => {
               const next = chartPoints[index + 1];
@@ -240,11 +240,16 @@ export default async function LandscapeWeather() {
             })}
             {labelIndices.map((index) => {
               const point = chartPoints[index];
-              return <b className={`absolute z-[3] rounded-sm bg-white px-1 py-0.5 text-[11px] font-semibold ${index === 0 ? 'text-black' : 'text-[#555]'}`} key={index} style={{ left: Math.min(716, Math.max(0, point.x - 8)), top: Math.max(0, point.y - 24) }}>{dashboard.hourly[index].temp}°</b>;
+              const isHighest = dashboard.hourly[index].temp === highestTemperature;
+              return <b className={`absolute z-[3] rounded-sm bg-white px-1 py-0.5 text-[11px] font-semibold ${index === 0 ? 'text-black' : 'text-[#555]'}`} key={index} style={{ left: point.x, top: Math.max(isHighest ? -6 : 0, point.y - (isHighest ? 30 : 24)), transform: index === 0 ? undefined : 'translateX(-50%)' }}>{dashboard.hourly[index].temp}°</b>;
             })}
           </div>
-          <div className="grid grid-cols-8 pt-1.5 text-center text-xs font-medium text-[#555]">
-            {labelIndices.map((index) => <span key={index}>{dashboard.hourly[index].time}</span>)}
+          <div className="relative h-6 w-[746px] text-xs font-medium text-[#555]">
+            {labelIndices.map((index) => (
+              <span className="absolute top-1.5 whitespace-nowrap" key={index} style={{ left: chartPoints[index].x, transform: index === 0 ? undefined : 'translateX(-50%)' }}>
+                {dashboard.hourly[index].time}
+              </span>
+            ))}
           </div>
         </section>
 

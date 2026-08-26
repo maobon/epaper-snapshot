@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { CaretRightIcon } from '@phosphor-icons/react/dist/ssr/CaretRight';
 import { CloudIcon } from '@phosphor-icons/react/dist/ssr/Cloud';
 import { CloudLightningIcon } from '@phosphor-icons/react/dist/ssr/CloudLightning';
 import { CloudRainIcon } from '@phosphor-icons/react/dist/ssr/CloudRain';
@@ -153,16 +152,12 @@ export default async function FifteenDayForecast() {
   return (
     <main className="portrait-stage grid min-h-screen min-w-[480px] place-items-center bg-white font-sans text-black">
       <section className="epaper-forecast15 flex h-[800px] w-[480px] flex-col gap-[3px] overflow-hidden rounded-none border-2 border-black bg-white p-2" aria-label={`${city} 15-day weather forecast`}>
-        <header className="forecast15-header shrink-0 overflow-hidden rounded-xl border border-[#555] bg-white px-2 py-1.5">
-          <div className="flex h-[26px] items-center justify-between">
+        <header className="forecast15-header shrink-0 overflow-hidden bg-white px-2 py-1.5">
+          <div className="flex h-full items-center justify-between">
             <div>
               <h1 className="text-base leading-none font-semibold tracking-tight">15-DAY FORECAST</h1>
               <p className="mt-1 text-[9px] font-semibold tracking-wide text-[#555] uppercase">{city} · {range}</p>
             </div>
-            <span className="rounded-full bg-black px-2.5 py-1 text-[9px] font-semibold text-white">15 DAYS</span>
-          </div>
-          <div className="forecast15-columns mt-1.5 text-[8px] font-semibold tracking-wide text-[#555] uppercase">
-            <span>Date</span><span>Sky</span><span>High / Low</span><span>Rain</span><span>Wind</span><span />
           </div>
         </header>
 
@@ -171,7 +166,7 @@ export default async function FifteenDayForecast() {
             const WeatherIcon = weatherIcons[item.kind];
             return (
               <article
-                className="forecast15-columns forecast15-row shrink-0 items-center overflow-hidden rounded-xl border border-[#555] bg-white px-2"
+                className="forecast15-columns forecast15-row shrink-0 items-center overflow-hidden bg-white px-2"
                 key={item.date}
                 aria-label={`${item.day} ${item.date}, ${item.condition}, high ${item.high}, low ${item.low}, ${item.rain} percent rain, wind ${item.windDirection} ${item.windSpeed} ${windSpeedUnit}`}
               >
@@ -182,11 +177,10 @@ export default async function FifteenDayForecast() {
                 <WeatherIcon color="#555" size={27} weight="light" aria-hidden="true" />
                 <p className="text-[11px] whitespace-nowrap"><strong className="font-semibold">{item.high}°</strong><span className="text-[#555]"> / {item.low}°</span></p>
                 <p className="flex items-center gap-1 text-[10px]"><DropIcon color="#555" size={13} weight="light" aria-hidden="true" /><span>{item.rain}%</span></p>
-                <div className="min-w-0 leading-tight">
+                <div className="min-w-0 max-w-full justify-self-end text-right leading-tight">
                   <p className="truncate text-[10px] font-semibold">{item.windDirection} · {item.windSpeed} {windSpeedUnit}</p>
                   <p className="truncate text-[8px] text-[#555]">{item.condition}</p>
                 </div>
-                <CaretRightIcon color="#555" size={12} weight="light" aria-hidden="true" />
               </article>
             );
           })}
