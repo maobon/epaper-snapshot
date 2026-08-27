@@ -24,6 +24,8 @@ export async function GET(_request: Request, context: { params: Promise<{ name: 
         'X-Image-Height': String(EPAPER_IMAGE_SPECS[name].height),
         'X-Epaper-Gray-Levels': '0,85,170,255',
         'X-Image-Renderer': 'svg-resvg',
+        'X-Render-Data-Source': image.manifest.source,
+        'X-Render-Data-Fingerprint': image.manifest.fingerprint,
       },
     });
   } catch (error) {

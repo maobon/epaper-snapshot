@@ -3,8 +3,9 @@ import { join } from 'node:path';
 import { BitDepth, ColorType, decode, encode } from '@cf-wasm/png/node';
 import { Resvg } from '@cf-wasm/resvg/node';
 import { fetchMonthlyUsdCnh, type ExchangeRatePoint } from '@/lib/exchange-rate-api';
-import { fetchDailyWeather, fetchDaysWeather, fetchHourlyWeather } from '@/lib/weather-api';
-import { getWeatherPresentation, type WeatherDisplayKind, type WeatherKind } from '@/lib/weather-presentation';
+import { createRenderManifest, type RenderManifest } from '@/lib/render-monitor';
+import { loadForecast15Dashboard, loadLandscapeDashboard, loadPortraitDashboard } from '@/lib/weather-dashboard';
+import type { WeatherDisplayKind } from '@/lib/weather-presentation';
 
 export type EpaperImageName = 'currency' | 'landscape' | 'portrait' | 'forecast-15d';
 
@@ -134,7 +135,8 @@ const fallbackRates: ExchangeRatePoint[] = [
 
 async function currencySvg() {
   let points = fallbackRates;
-  try { points = (await fetchMonthlyUsdCnh()).points; } catch { /* retain deterministic fallback */ }
+  let source: 'live' | 'fallback' = 'fallback';
+  try { points = (await fetchMonthlyUsdCnh()).points; source = 'live'; } catch { /* retain deterministic fallback */ }
   const values = points.map((point) => point.rate);
   const current = values.at(-1) ?? 6.7167;
   const min = Math.min(...values), max = Math.max(...values), padding = Math.max(0.008, (max - min) * 0.16);
@@ -174,61 +176,15 @@ async function currencySvg() {
     body += text(labelX + 23, labelY + 10, points[pointIndex].rate.toFixed(4), 9, 700, { anchor: 'middle', fill: DARK });
   });
   labels.forEach((pointIndex, index) => { body += text(chart[pointIndex].x, 463, dateLabel(points[pointIndex].date), 11, 700, { anchor: index === 0 ? 'start' : index === labels.length - 1 ? 'end' : 'middle', fill: DARK }); });
-  return svgDocument(800, 480, body);
-}
-
-type LandscapeData = {
-  city: string;
-  time: string;
-  current: { temp: number; condition: string; kind: WeatherKind; rain: number; humidity: number; wind: number };
-  hourly: Array<{ time: string; temp: number }>;
-  days: Array<{ day: string; high: number; low: number; condition: string; kind: WeatherKind }>;
-};
-
-const fallbackLandscape: LandscapeData = {
-  city: 'Beijing', time: 'WED · 00:42',
-  current: { temp: 23, condition: 'Cloudy', kind: 'cloudy', rain: 46, humidity: 87, wind: 7 },
-  hourly: [23, 23, 22, 22, 22, 23, 23, 25, 25, 27, 27, 27, 27, 25, 25, 25, 24, 24, 24, 24, 23, 23, 24, 24].map((temp, index) => ({ time: index === 0 ? 'Now' : `${String(index).padStart(2, '0')}:00`, temp })),
-  days: [
-    ['Wed', 27, 21, 'Cloudy', 'cloudy'], ['Thu', 29, 21, 'Cloudy', 'cloudy'], ['Fri', 24, 19, 'Light rain', 'rain'], ['Sat', 29, 19, 'Sunny', 'sunny'],
-    ['Sun', 31, 19, 'Sunny', 'sunny'], ['Mon', 29, 20, 'Sunny', 'sunny'], ['Tue', 29, 19, 'Sunny', 'sunny'], ['Wed', 29, 19, 'Sunny', 'sunny'],
-  ].map(([day, high, low, condition, kind]) => ({ day: String(day), high: Number(high), low: Number(low), condition: String(condition), kind: kind as WeatherKind })),
-};
-
-async function getLandscapeData(): Promise<LandscapeData> {
-  type Hour = { temp?: number; rainprobability?: number; humidity?: number; ws?: number; time?: string; showHour?: string; weaType?: string; icon?: string };
-  type Day = { publicDate?: string; maxtemp?: number; mintemp?: number; dayWeaName?: string; dayWeaIcon?: string };
-  type Source = { currentTime?: string; cityInfo?: { localizedName?: string; englishName?: string }; actual?: { temperature?: number; humidity?: number; windspeed?: number; weaName?: string; weaIcon?: string }; hourly?: Hour[]; days?: { dailyWeathers?: Day[] } };
-  try {
-    const source = await fetchHourlyWeather<Source>();
-    const hours = (source.hourly ?? []).slice(0, 24);
-    const today = source.currentTime?.slice(0, 10) ?? '';
-    const allDays = source.days?.dailyWeathers ?? [];
-    const start = Math.max(0, allDays.findIndex((day) => day.publicDate === today));
-    const days = allDays.slice(start, start + 8).map((day) => {
-      const presentation = getWeatherPresentation(day.dayWeaName, day.dayWeaIcon);
-      const weekday = day.publicDate ? new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${day.publicDate}T12:00:00Z`)) : '—';
-      return { day: weekday, high: day.maxtemp ?? 0, low: day.mintemp ?? 0, condition: presentation.label, kind: presentation.kind };
-    });
-    if (!source.actual || hours.length < 8 || days.length < 8) return fallbackLandscape;
-    const currentPresentation = getWeatherPresentation(source.actual.weaName ?? hours[0]?.weaType, source.actual.weaIcon ?? hours[0]?.icon);
-    const timeParts = source.currentTime?.split(' ') ?? [];
-    const weekday = timeParts[0] ? new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${timeParts[0]}T12:00:00Z`)).toUpperCase() : 'NOW';
-    return {
-      city: source.cityInfo?.localizedName ?? source.cityInfo?.englishName ?? fallbackLandscape.city,
-      time: `${weekday} · ${(timeParts[1] ?? '00:00').slice(0, 5)}`,
-      current: { temp: source.actual.temperature ?? 0, condition: currentPresentation.label, kind: currentPresentation.kind, rain: hours[0]?.rainprobability ?? 0, humidity: source.actual.humidity ?? hours[0]?.humidity ?? 0, wind: source.actual.windspeed ?? hours[0]?.ws ?? 0 },
-      hourly: hours.map((hour, index) => ({ time: index === 0 ? 'Now' : hour.time?.slice(11, 16) ?? `${String(index).padStart(2, '0')}:00`, temp: hour.temp ?? 0 })),
-      days,
-    };
-  } catch { return fallbackLandscape; }
+  return { svg: svgDocument(800, 480, body), manifest: createRenderManifest('currency', source, points) };
 }
 
 async function landscapeSvg() {
-  const data = await getLandscapeData();
+  const loaded = await loadLandscapeDashboard();
+  const data = loaded.data;
   let body = rect(1, 1, 798, 478, 0, BLACK, WHITE, 2);
   body += rect(15, 15, 84, 31, 16, DARK, WHITE, 2) + text(27, 36, data.city, 14, 700);
-  body += text(698, 35, data.time, 12, 700, { anchor: 'end', fill: DARK });
+  body += text(698, 35, data.dateLabel, 12, 700, { anchor: 'end', fill: DARK });
   body += rect(706, 19, 79, 23, 12, BLACK, BLACK, 0) + text(745, 35, data.current.condition.toUpperCase(), 12, 700, { anchor: 'middle', fill: WHITE });
   body += rect(15, 55, 770, 99, 16, DARK, WHITE, 2);
   body += weatherIcon(data.current.kind, 31, 72, 64, BLACK);
@@ -246,7 +202,7 @@ async function landscapeSvg() {
   const hourlyPoints = data.hourly.map((hour, index) => ({ x: 28 + index * 746 / Math.max(1, data.hourly.length - 1), y: 270 - (hour.temp - min) / span * 56 }));
   body += line(28, 278, 774, 278, LIGHT, 1) + `<path d="${hourlyPoints.map((p, i) => `${i ? 'L' : 'M'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="${BLACK}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
   [0, 3, 6, 9, 12, 15, 18, 21].forEach((index) => { const point = hourlyPoints[index], isHighest = data.hourly[index].temp === max; body += text(point.x, Math.max(isHighest ? 199 : 205, point.y - (isHighest ? 14 : 8)), `${data.hourly[index].temp}°`, 11, 700, { anchor: index === 0 ? 'start' : 'middle', fill: DARK }); body += text(point.x, 297, data.hourly[index].time, 11, 700, { anchor: index === 0 ? 'start' : 'middle', fill: DARK }); });
-  data.days.forEach((day, index) => {
+  data.forecast.forEach((day, index) => {
     const x = 15 + index * 97;
     const selected = index === 0;
     body += rect(x, 325, 92, 141, 12, selected ? BLACK : LIGHT, selected ? DARK : WHITE, 2);
@@ -256,69 +212,7 @@ async function landscapeSvg() {
     body += text(x + 35, 452, `${day.high}°`, 13, 700, { anchor: 'end', fill: selected ? WHITE : BLACK });
     body += text(x + 41, 452, `${day.low}°`, 13, 400, { fill: selected ? LIGHT : DARK });
   });
-  return svgDocument(800, 480, body);
-}
-
-type PortraitDay = { date: string; day: string; high: number; low: number; kind: WeatherKind; condition: string; wind: string; level: number };
-type PortraitData = {
-  city: string; date: string; windUnit: string; distanceUnit: string; day: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gust: number; feels: number; visibility: number; uv: string; cloud: number }; night: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gust: number };
-  aqi: Array<{ time: string; value: number }>; life: string[]; forecast: PortraitDay[];
-};
-
-const fallbackPortrait: PortraitData = {
-  city: 'Chaoyang District', date: '08/26 WED', windUnit: 'km/h', distanceUnit: 'km',
-  day: { temp: 27, kind: 'cloudy', condition: 'Cloudy', wind: 7, gust: 2, feels: 31, visibility: 10, uv: 'Low', cloud: 95 },
-  night: { temp: 21, kind: 'partly-small', condition: 'Partly cloudy', wind: 9, gust: 2 },
-  aqi: Array.from({ length: 13 }, (_, index) => ({ time: String(index).padStart(2, '0'), value: 20 + index * 2 })),
-  life: ['Dressing · Short sleeve', 'Car wash · Not suitable', 'Sports · Suitable', 'Colds · Easier'],
-  forecast: [
-    ['08/25', 'Yesterday', 30, 22, 'rain', 'Mod. rain', 'NE', 2], ['08/26', 'Today', 27, 21, 'cloudy', 'Cloudy', 'NW', 2], ['08/27', 'Thu', 29, 21, 'cloudy', 'Cloudy', 'N', 1],
-    ['08/28', 'Fri', 24, 19, 'rain', 'Light rain', 'N', 1], ['08/29', 'Sat', 29, 19, 'sunny', 'Sunny', 'SW', 2], ['08/30', 'Sun', 31, 19, 'sunny', 'Sunny', 'NW', 2], ['08/31', 'Mon', 29, 20, 'sunny', 'Sunny', 'NE', 2],
-  ].map(([date, day, high, low, kind, condition, wind, level]) => ({ date: String(date), day: String(day), high: Number(high), low: Number(low), kind: kind as WeatherKind, condition: String(condition), wind: String(wind), level: Number(level) })),
-};
-
-async function getPortraitData(): Promise<PortraitData> {
-  type Condition = { cloudCover?: number; winddir?: string; windspeed?: number; windlevel?: number; windGustPow?: number; weaName?: string; weaIcon?: string };
-  type Day = { publicDate: string; maxtemp?: number; mintemp?: number; realFeelTempMax?: number; visibility?: number; uvIndex?: number; dayWeaName?: string; nightWeaName?: string; conditionDay?: Condition; conditionNight?: Condition };
-  type LifeIndex = { code?: string; levelList?: Array<{ day?: string; level?: string }> };
-  type Source = { currentTime?: string; cityInfo?: { localizedName?: string; englishName?: string }; windSpeedUnit?: string; disUnit?: string; forecastList?: { dailyWeathers?: Day[] }; lifeIndex?: LifeIndex[] };
-  type HourlySource = {
-    actual?: { temperature?: number; realfeel?: number; visibility?: number; cloudCover?: number; uvindex?: number; windspeed?: number; windgustlevel?: number; weaName?: string; weaIcon?: string };
-    hourly?: Array<{ time?: string; aqi?: number; isdaynight?: boolean }>;
-  };
-  try {
-    const [source, hourlySource] = await Promise.all([fetchDailyWeather<Source>(), fetchHourlyWeather<HourlySource>()]);
-    const days = source.forecastList?.dailyWeathers ?? [], currentDate = source.currentTime ?? '';
-    const currentIndex = days.findIndex((day) => day.publicDate === currentDate), current = days[currentIndex];
-    if (!current || !hourlySource.actual) return fallbackPortrait;
-    const currentHour = hourlySource.hourly?.[0];
-    const dayPresentation = getWeatherPresentation(hourlySource.actual.weaName, hourlySource.actual.weaIcon, currentHour?.isdaynight ?? true);
-    const nightPresentation = getWeatherPresentation(current.nightWeaName, current.conditionNight?.weaIcon, false);
-    const forecast = days.slice(Math.max(0, currentIndex - 1), Math.max(0, currentIndex - 1) + 7).map((day, index) => {
-      const presentation = getWeatherPresentation(day.dayWeaName, day.conditionDay?.weaIcon);
-      const parsed = new Date(`${day.publicDate}T12:00:00Z`), mmdd = `${String(parsed.getUTCMonth() + 1).padStart(2, '0')}/${String(parsed.getUTCDate()).padStart(2, '0')}`;
-      return { date: mmdd, day: index === 0 ? 'Yesterday' : index === 1 ? 'Today' : new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(parsed), high: day.maxtemp ?? 0, low: day.mintemp ?? 0, kind: presentation.kind, condition: presentation.label, wind: day.conditionDay?.winddir ?? '—', level: day.conditionDay?.windlevel ?? 0 };
-    });
-    if (forecast.length < 7) return fallbackPortrait;
-    const parsed = new Date(`${currentDate}T12:00:00Z`), displayDate = `${String(parsed.getUTCMonth() + 1).padStart(2, '0')}/${String(parsed.getUTCDate()).padStart(2, '0')} ${new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(parsed).toUpperCase()}`;
-    const lifeLevel = (code: string) => source.lifeIndex?.find((item) => item.code === code)?.levelList?.find((item) => item.day === currentDate)?.level;
-    const translateLife = (code: string, value?: string) => {
-      const labels: Record<string, Record<string, string>> = {
-        '2': { '短袖': 'Short sleeve', '长袖': 'Long sleeve', '薄外套': 'Light jacket' },
-        '4': { '不宜': 'Not suitable', '较不宜': 'Less suitable', '适宜': 'Suitable', '较适宜': 'Suitable' },
-        '5': { '不宜': 'Not suitable', '较不宜': 'Not suitable', '适宜': 'Suitable', '较适宜': 'Suitable' },
-        '3': { '极易': 'Very easy', '较易': 'Easier', '易发': 'Likely', '少发': 'Unlikely', '不易': 'Unlikely' },
-      };
-      return (value && labels[code]?.[value]) || value || '—';
-    };
-    return {
-      city: source.cityInfo?.localizedName ?? source.cityInfo?.englishName ?? fallbackPortrait.city, date: displayDate, windUnit: source.windSpeedUnit ?? fallbackPortrait.windUnit, distanceUnit: source.disUnit ?? fallbackPortrait.distanceUnit,
-      day: { temp: hourlySource.actual.temperature ?? 0, kind: dayPresentation.kind, condition: dayPresentation.label, wind: hourlySource.actual.windspeed ?? 0, gust: hourlySource.actual.windgustlevel ?? 0, feels: hourlySource.actual.realfeel ?? 0, visibility: hourlySource.actual.visibility ?? 0, uv: (hourlySource.actual.uvindex ?? 0) <= 2 ? 'Low' : (hourlySource.actual.uvindex ?? 0) <= 5 ? 'Moderate' : 'High', cloud: hourlySource.actual.cloudCover ?? 0 },
-      night: { temp: current.mintemp ?? 0, kind: nightPresentation.kind, condition: nightPresentation.label, wind: current.conditionNight?.windspeed ?? 0, gust: current.conditionNight?.windGustPow ?? 0 },
-      aqi: (hourlySource.hourly ?? []).slice(0, 13).map((item, index) => ({ time: item.time?.slice(11, 13) ?? String(index).padStart(2, '0'), value: item.aqi ?? 0 })),
-      life: [`Dressing · ${translateLife('2', lifeLevel('2'))}`, `Car wash · ${translateLife('4', lifeLevel('4'))}`, `Sports · ${translateLife('5', lifeLevel('5'))}`, `Colds · ${translateLife('3', lifeLevel('3'))}`], forecast,
-    };
-  } catch { return fallbackPortrait; }
+  return { svg: svgDocument(800, 480, body), manifest: createRenderManifest('landscape', loaded.source, data) };
 }
 
 function sectionTitle(y: number, title: string, note?: string) {
@@ -326,51 +220,35 @@ function sectionTitle(y: number, title: string, note?: string) {
 }
 
 async function portraitSvg() {
-  const data = await getPortraitData();
+  const loaded = await loadPortraitDashboard();
+  const data = loaded.data;
   let body = rect(1, 1, 478, 798, 0, BLACK, WHITE, 2);
-  body += rect(10, 10, 460, 184, 14, DARK, WHITE, 2) + text(20, 34, 'CURRENT', 14, 700) + text(460, 34, `${data.city.toUpperCase()} · ${data.date}`, 11, 700, { anchor: 'end', fill: DARK });
+  body += rect(10, 10, 460, 184, 14, DARK, WHITE, 2) + text(20, 34, 'CURRENT', 14, 700) + text(460, 34, `${data.city.toUpperCase()} · ${data.dateLabel}`, 11, 700, { anchor: 'end', fill: DARK });
   body += text(20, 106, data.day.temp, 68, 700) + text(91, 65, '°', 26, 700) + weatherIcon(data.day.kind, 201, 47, 48, DARK) + text(225, 111, data.day.condition.toUpperCase(), 12, 700, { anchor: 'middle' });
-  body += text(358, 70, `Wind ${data.day.wind} ${data.windUnit}`, 13, 700) + text(358, 94, `Gust · Level ${data.day.gust}`, 13, 700);
+  body += text(358, 70, `Wind ${data.day.wind} ${data.windUnit}`, 13, 700) + text(358, 94, `Gust · Level ${data.day.gustLevel}`, 13, 700);
   body += line(20, 122, 460, 122, LIGHT, 1);
   const detail = [['FEELS LIKE', `${data.day.feels}°`], ['VISIBILITY', `${data.day.visibility} ${data.distanceUnit}`], ['UV INDEX', data.day.uv], ['CLOUD', `${data.day.cloud}%`]];
   detail.forEach(([label, value], index) => { const x = 20 + index * 110; if (index) body += line(x, 130, x, 184, LIGHT, 1); body += text(x + 10, 153, label, 9, 700, { fill: DARK, spacing: 0.5 }) + text(x + 10, 177, value, 14, 700); });
   body += rect(10, 201, 460, 96, 14, DARK, WHITE, 2) + sectionTitle(225, 'NIGHT', '18:00 — 06:00');
-  body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 170, 235, 38, DARK) + text(216, 265, data.night.condition.toUpperCase(), 10, 700) + text(358, 253, `Wind ${data.night.wind} ${data.windUnit}`, 13, 700) + text(358, 277, `Gust · Level ${data.night.gust}`, 13, 700);
+  body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 170, 235, 38, DARK) + text(216, 265, data.night.condition.toUpperCase(), 10, 700) + text(358, 253, `Wind ${data.night.wind} ${data.windUnit}`, 13, 700) + text(358, 277, `Gust · Level ${data.night.gustLevel}`, 13, 700);
   body += rect(10, 304, 460, 123, 14, DARK, WHITE, 2) + sectionTitle(328, 'HOURLY AQI FORECAST', 'LIVE') + line(20, 410, 460, 410, LIGHT, 1);
-  const aqi = data.aqi.length >= 13 ? data.aqi.slice(0, 13) : fallbackPortrait.aqi;
+  const aqi = data.hourly;
   aqi.forEach((item, index) => { const x = 40 + index * 33; const height = Math.max(14, Math.min(45, item.value * 0.45)); body += `<rect x="${x - 4}" y="${402 - height}" width="8" height="${height}" rx="3" fill="${index === 0 ? DARK : LIGHT}"/>` + text(x, 420, item.time, 9, 700, { anchor: 'middle', fill: DARK }); });
   body += rect(10, 434, 460, 118, 14, DARK, WHITE, 2) + sectionTitle(458, 'LIFE INDEX', 'TODAY');
   body += line(240, 466, 240, 542, LIGHT, 1) + line(20, 506, 230, 506, LIGHT, 1) + line(250, 506, 460, 506, LIGHT, 1);
-  data.life.forEach((item, index) => { const [label, value] = item.split(' · '); const col = index % 2, row = Math.floor(index / 2), x = 28 + col * 230, y = 487 + row * 40; body += text(x, y, label, 12, 700) + text(x, y + 15, value, 11, 400, { fill: DARK }); });
+  Object.entries({ Dressing: data.life.dressing, 'Car wash': data.life.carWash, Sports: data.life.sports, Colds: data.life.colds }).forEach(([label, value], index) => { const col = index % 2, row = Math.floor(index / 2), x = 28 + col * 230, y = 487 + row * 40; body += text(x, y, label, 12, 700) + text(x, y + 15, value, 11, 400, { fill: DARK }); });
   body += rect(10, 559, 460, 231, 14, DARK, WHITE, 2) + sectionTitle(583, '7-DAY FORECAST', 'LIVE');
   const forecastX = (index: number) => 20 + ((index + 0.5) * 440) / data.forecast.length;
   data.forecast.forEach((day, index) => { const x = forecastX(index); body += text(x, 601, day.date, 9, 700, { anchor: 'middle', fill: DARK }) + text(x, 616, day.day, 10, 700, { anchor: 'middle' }) + weatherIcon(day.kind, x - 14, 621, 28, DARK) + text(x, 667, day.condition.length > 10 ? day.condition.slice(0, 9) : day.condition, 9, 700, { anchor: 'middle' }) + text(x, 700, `${day.high}°`, 11, 700, { anchor: 'middle' }) + text(x, 743, `${day.low}°`, 10, 700, { anchor: 'middle', fill: DARK }) + text(x, 766, `${day.wind} · ${day.level}`, 9, 700, { anchor: 'middle' }); });
   const high = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${718 - (day.high - Math.min(...data.forecast.map((item) => item.high))) * 3}`).join(' ');
   const low = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${756 - (day.low - Math.min(...data.forecast.map((item) => item.low))) * 3}`).join(' ');
   body += `<path d="${high}" fill="none" stroke="${BLACK}" stroke-width="2"/><path d="${low}" fill="none" stroke="${LIGHT}" stroke-width="2"/>`;
-  return svgDocument(480, 800, body);
-}
-
-type Forecast15Item = { day: string; date: string; condition: string; kind: WeatherKind; high: number; low: number; rain: number; wind: string; speed: number };
-const fallback15: Forecast15Item[] = Array.from({ length: 15 }, (_, index) => {
-  const date = new Date(Date.UTC(2026, 7, 27 + index));
-  const kinds: WeatherKind[] = ['cloudy', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'cloudy', 'cloudy', 'sunny', 'cloudy', 'cloudy', 'cloudy', 'cloudy'];
-  return { day: new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(date), date: `${String(date.getUTCMonth() + 1).padStart(2, '0')}/${String(date.getUTCDate()).padStart(2, '0')}`, condition: kinds[index] === 'sunny' ? 'Sunny' : kinds[index] === 'rain' ? 'Light rain' : 'Cloudy', kind: kinds[index], high: [29, 24, 29, 31, 29, 29, 29, 28, 30, 26, 30, 29, 25, 25, 26][index], low: [21, 19, 19, 19, 20, 19, 19, 20, 21, 18, 20, 20, 18, 18, 17][index], rain: [10, 80, 5, 5, 5, 5, 5, 5, 10, 30, 5, 20, 20, 10, 10][index], wind: ['N', 'N', 'SW', 'NW', 'NE', 'SE', 'SE', 'S', 'SE', 'SE', 'SE', 'SW', 'SE', 'SE', 'SE'][index], speed: [5, 4, 6, 9, 9, 8, 10, 11, 8, 9, 6, 8, 9, 6, 6][index] };
-});
-
-async function getForecast15() {
-  type SourceDay = { publicDate: string; showDay?: string; maxtemp?: number; mintemp?: number; dayWeaName?: string; dayWeaIcon?: string; conditionDay?: { precProb?: number; rainProb?: number; winddir?: string; windspeed?: number } };
-  type Source = { currentTime?: string; cityInfo?: { localizedName?: string; englishName?: string }; days?: { dailyWeathers?: SourceDay[] } };
-  try {
-    const source = await fetchDaysWeather<Source>();
-    const future = (source.days?.dailyWeathers ?? []).filter((day) => day.publicDate > (source.currentTime ?? '')).slice(0, 15);
-    if (future.length < 15) return { city: 'Chaoyang District', items: fallback15 };
-    return { city: source.cityInfo?.localizedName ?? source.cityInfo?.englishName ?? 'Chaoyang District', items: future.map((day) => { const presentation = getWeatherPresentation(day.dayWeaName, day.dayWeaIcon), condition = day.conditionDay ?? {}; return { day: new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${day.publicDate}T12:00:00Z`)), date: day.showDay || day.publicDate.slice(5).replace('-', '/'), condition: presentation.label, kind: presentation.kind, high: Math.round(day.maxtemp ?? 0), low: Math.round(day.mintemp ?? 0), rain: Math.round(condition.precProb ?? condition.rainProb ?? 0), wind: condition.winddir ?? '—', speed: Math.round(condition.windspeed ?? 0) }; }) };
-  } catch { return { city: 'Chaoyang District', items: fallback15 }; }
+  return { svg: svgDocument(480, 800, body), manifest: createRenderManifest('portrait', loaded.source, data) };
 }
 
 async function forecast15Svg() {
-  const { city, items } = await getForecast15();
+  const loaded = await loadForecast15Dashboard();
+  const { city, forecast: items } = loaded.data;
   let body = rect(1, 1, 478, 798, 0, BLACK, WHITE, 2);
   body += text(18, 32, '15-DAY FORECAST', 15, 700) + text(18, 47, `${city.toUpperCase()} · ${items[0].date} — ${items.at(-1)?.date}`, 9, 700, { fill: DARK, spacing: 0.4 });
   items.forEach((item, index) => {
@@ -379,15 +257,16 @@ async function forecast15Svg() {
     body += weatherIcon(item.kind, 108, y + 7, 30, DARK);
     body += text(176, y + 23, `${item.high}°`, 13, 700) + text(207, y + 23, `/ ${item.low}°`, 12, 700, { fill: DARK });
     body += text(282, y + 23, `${item.rain}%`, 11, 700);
-    body += text(460, y + 19, `${item.wind} · ${item.speed} km/h`, 11, 700, { anchor: 'end' }) + text(460, y + 34, item.condition, 9, 700, { anchor: 'end', fill: DARK });
+    body += text(460, y + 19, `${item.windDirection} · ${item.windSpeed} ${loaded.data.windSpeedUnit}`, 11, 700, { anchor: 'end' }) + text(460, y + 34, item.condition, 9, 700, { anchor: 'end', fill: DARK });
   });
-  return svgDocument(480, 800, body);
+  return { svg: svgDocument(480, 800, body), manifest: createRenderManifest('forecast-15d', loaded.source, loaded.data) };
 }
 
 export async function generateEpaperImage(name: EpaperImageName) {
-  const svg = name === 'currency' ? await currencySvg() : name === 'landscape' ? await landscapeSvg() : name === 'portrait' ? await portraitSvg() : await forecast15Svg();
+  const rendered: { svg: string; manifest: RenderManifest } = name === 'currency' ? await currencySvg() : name === 'landscape' ? await landscapeSvg() : name === 'portrait' ? await portraitSvg() : await forecast15Svg();
+  const { svg, manifest } = rendered;
   const png = await svgToFourGrayPng(svg);
-  return { png, svg, ...EPAPER_IMAGE_SPECS[name] };
+  return { png, svg, manifest, ...EPAPER_IMAGE_SPECS[name] };
 }
 
 export function imageCacheHeaders(fileName: string) {

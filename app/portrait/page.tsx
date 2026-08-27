@@ -14,8 +14,8 @@ import { SunIcon } from '@phosphor-icons/react/dist/ssr/Sun';
 import { ThermometerSimpleIcon } from '@phosphor-icons/react/dist/ssr/ThermometerSimple';
 import { TShirtIcon } from '@phosphor-icons/react/dist/ssr/TShirt';
 import { WindIcon } from '@phosphor-icons/react/dist/ssr/Wind';
-import { fetchDailyWeather, fetchHourlyWeather } from '@/lib/weather-api';
-import { getWeatherPresentation, type WeatherDisplayKind, type WeatherKind } from '@/lib/weather-presentation';
+import { createRenderManifest, serializeRenderManifest } from '@/lib/render-monitor';
+import { fallbackPortrait, loadPortraitDashboard } from '@/lib/weather-dashboard';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,122 +26,9 @@ export const metadata: Metadata = {
   twitter: { card: 'summary', title: 'Chaoyang District Weather · Portrait', description: 'Live portrait weather dashboard for e-paper.', images: [] },
 };
 
-type Condition = { cloudCover?: number; winddir?: string; windGustPow?: number; windlevel?: number; windspeed?: number; weaName?: string; weaIcon?: string };
-type SourceDay = { publicDate: string; maxtemp?: number; mintemp?: number; realFeelTempMax?: number; visibility?: number; uvIndex?: number; dayWeaName?: string; nightWeaName?: string; conditionDay?: Condition; conditionNight?: Condition };
-type SourceData = {
-  cityInfo?: { localizedName?: string; englishName?: string; name?: string };
-  currentTime?: string;
-  disUnit?: string;
-  windSpeedUnit?: string;
-  forecastList?: { dailyWeathers?: SourceDay[] };
-  aqiHourly?: Array<{ time?: string; aqi?: number; lv?: number }>;
-  lifeIndex?: Array<{ code?: string; levelList?: Array<{ day?: string; level?: string }> }>;
-};
-type HourlyData = {
-  actual?: {
-    temperature?: number;
-    realfeel?: number;
-    visibility?: number;
-    cloudCover?: number;
-    uvindex?: number;
-    windspeed?: number;
-    windgustlevel?: number;
-    weaName?: string;
-    weaIcon?: string;
-  };
-  hourly?: Array<{ time?: string; aqi?: number; isdaynight?: boolean }>;
-};
-type ForecastDay = { date: string; day: string; condition: string; high: number; low: number; wind: string; level: number; kind: WeatherKind };
-type Dashboard = {
-  city: string;
-  dateLabel: string;
-  day: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gustLevel: number; feels: number; visibility: number; uv: string; cloud: number };
-  night: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gustLevel: number };
-  distanceUnit: string;
-  windUnit: string;
-  hourly: Array<{ time: string; value: number; level: number }>;
-  life: { dressing: string; carWash: string; sports: string; colds: string };
-  forecast: ForecastDay[];
-};
-
-const fallbackForecast: ForecastDay[] = [
-  { date: '08/24', day: 'Yesterday', condition: 'Cloudy', high: 32, low: 25, wind: 'SE', level: 2, kind: 'cloudy' },
-  { date: '08/25', day: 'Today', condition: 'Mod. rain', high: 30, low: 21, wind: 'NE', level: 2, kind: 'rain' },
-  { date: '08/26', day: 'Wed', condition: 'Cloudy', high: 27, low: 21, wind: 'NW', level: 2, kind: 'cloudy' },
-  { date: '08/27', day: 'Thu', condition: 'Cloudy', high: 29, low: 21, wind: 'N', level: 1, kind: 'cloudy' },
-  { date: '08/28', day: 'Fri', condition: 'Light rain', high: 24, low: 19, wind: 'NW', level: 1, kind: 'rain' },
-  { date: '08/29', day: 'Sat', condition: 'Sunny', high: 29, low: 19, wind: 'SW', level: 2, kind: 'sunny' },
-  { date: '08/30', day: 'Sun', condition: 'Sunny', high: 31, low: 19, wind: 'NW', level: 2, kind: 'sunny' },
-];
-const fallback: Dashboard = {
-  city: 'Chaoyang District', dateLabel: '08/25 TUE', distanceUnit: 'km', windUnit: 'km/h',
-  day: { temp: 30, kind: 'rain', condition: 'Moderate rain', wind: 10, gustLevel: 3, feels: 34, visibility: 6, uv: 'Moderate', cloud: 95 },
-  night: { temp: 21, kind: 'storm', condition: 'Thunderstorms', wind: 10, gustLevel: 3 },
-  hourly: [33, 30, 31, 37, 34, 36, 40, 35, 42, 60, 59, 55, 68].map((value, index) => ({ time: String(index).padStart(2, '0'), value, level: value <= 50 ? 1 : 2 })),
-  life: { dressing: 'Short sleeve', carWash: 'Not suitable', sports: 'Not suitable', colds: 'Easier' },
-  forecast: fallbackForecast,
-};
 const weatherIcons = { rain: CloudRainIcon, storm: CloudLightningIcon, snow: CloudSnowIcon, partly: CloudSunIcon, cloudy: CloudIcon, sunny: SunIcon, 'night-clear': MoonStarsIcon, 'partly-small': CloudMoonIcon };
 
-function uvLabel(value = 0) { return value <= 2 ? 'Low' : value <= 5 ? 'Moderate' : value <= 7 ? 'High' : value <= 10 ? 'Very high' : 'Extreme'; }
 function aqiLabel(value: number) { return value <= 50 ? 'EXCELLENT' : value <= 100 ? 'GOOD' : value <= 150 ? 'LIGHT' : 'POLLUTED'; }
-function translateLife(code: string, value?: string) {
-  const known: Record<string, Record<string, string>> = {
-    '2': { '短袖': 'Short sleeve', '长袖': 'Long sleeve', '薄外套': 'Light jacket' },
-    '4': { '不宜': 'Not suitable', '较不宜': 'Less suitable', '适宜': 'Suitable', '较适宜': 'Suitable' },
-    '5': { '不宜': 'Not suitable', '较不宜': 'Not suitable', '适宜': 'Suitable', '较适宜': 'Suitable' },
-    '3': { '极易': 'Very easy', '较易': 'Easier', '易发': 'Likely', '少发': 'Unlikely', '不易': 'Unlikely' },
-  };
-  return (value && known[code]?.[value]) || value || ({ '2': 'Short sleeve', '4': 'Not suitable', '5': 'Not suitable', '3': 'Easier' }[code] ?? '—');
-}
-function formatDate(date: string, relative?: 'today' | 'yesterday') {
-  const parsed = new Date(`${date}T12:00:00+08:00`);
-  const mmdd = `${String(parsed.getMonth() + 1).padStart(2, '0')}/${String(parsed.getDate()).padStart(2, '0')}`;
-  const weekday = parsed.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'Asia/Shanghai' });
-  return { mmdd, weekday, day: relative === 'today' ? 'Today' : relative === 'yesterday' ? 'Yesterday' : weekday };
-}
-
-async function getDashboard(): Promise<Dashboard> {
-  try {
-    const [data, hourlyData] = await Promise.all([
-      fetchDailyWeather<SourceData>(),
-      fetchHourlyWeather<HourlyData>(),
-    ]);
-    if (!data?.currentTime) throw new Error('Weather source omitted the current date');
-    if (!hourlyData?.actual) throw new Error('Weather source omitted current conditions');
-    const days = data.forecastList?.dailyWeathers ?? [];
-    const currentIndex = days.findIndex((item) => item.publicDate === data.currentTime);
-    const current = currentIndex >= 0 ? days[currentIndex] : undefined;
-    if (!current) throw new Error('Weather source omitted the current forecast');
-    const currentHour = hourlyData.hourly?.[0];
-    const dayWeather = getWeatherPresentation(hourlyData.actual.weaName, hourlyData.actual.weaIcon, currentHour?.isdaynight ?? true);
-    const nightWeather = getWeatherPresentation(current.nightWeaName, current.conditionNight?.weaIcon, false);
-    const currentDate = formatDate(data.currentTime, 'today');
-    const sevenDays = days.slice(Math.max(0, currentIndex - 1), Math.max(0, currentIndex - 1) + 7).map((item, index) => {
-      const presentation = getWeatherPresentation(item.dayWeaName, item.conditionDay?.weaIcon);
-      const formatted = formatDate(item.publicDate, index === 0 ? 'yesterday' : index === 1 ? 'today' : undefined);
-      return { date: formatted.mmdd, day: formatted.day, condition: presentation.label === 'Moderate rain' ? 'Mod. rain' : presentation.label, high: item.maxtemp ?? 0, low: item.mintemp ?? 0, wind: item.conditionDay?.winddir ?? '—', level: item.conditionDay?.windlevel ?? 0, kind: presentation.kind } satisfies ForecastDay;
-    });
-    const lifeValue = (code: string) => data.lifeIndex?.find((item) => item.code === code)?.levelList?.find((item) => item.day === data.currentTime)?.level;
-    return {
-      city: data.cityInfo?.localizedName ?? data.cityInfo?.englishName ?? data.cityInfo?.name ?? fallback.city,
-      dateLabel: `${currentDate.mmdd} ${currentDate.weekday.toUpperCase()}`,
-      day: { temp: hourlyData.actual.temperature ?? fallback.day.temp, kind: dayWeather.kind, condition: dayWeather.label, wind: hourlyData.actual.windspeed ?? fallback.day.wind, gustLevel: hourlyData.actual.windgustlevel ?? fallback.day.gustLevel, feels: hourlyData.actual.realfeel ?? fallback.day.feels, visibility: hourlyData.actual.visibility ?? fallback.day.visibility, uv: uvLabel(hourlyData.actual.uvindex), cloud: hourlyData.actual.cloudCover ?? fallback.day.cloud },
-      night: { temp: current.mintemp ?? fallback.night.temp, kind: nightWeather.kind, condition: nightWeather.label, wind: current.conditionNight?.windspeed ?? fallback.night.wind, gustLevel: current.conditionNight?.windGustPow ?? fallback.night.gustLevel },
-      distanceUnit: data.disUnit ?? fallback.distanceUnit,
-      windUnit: data.windSpeedUnit ?? fallback.windUnit,
-      hourly: (hourlyData.hourly ?? []).slice(0, 13).map((item, index) => {
-        const value = item.aqi ?? 0;
-        return { time: item.time?.slice(11, 13) ?? String(index).padStart(2, '0'), value, level: value <= 50 ? 1 : value <= 100 ? 2 : 3 };
-      }),
-      life: { dressing: translateLife('2', lifeValue('2')), carWash: translateLife('4', lifeValue('4')), sports: translateLife('5', lifeValue('5')), colds: translateLife('3', lifeValue('3')) },
-      forecast: sevenDays.length === 7 ? sevenDays : fallback.forecast,
-    };
-  } catch (error) {
-    console.error('Unable to load portrait weather data:', error);
-    return fallback;
-  }
-}
 function seriesPoints(values: number[], top: number, bottom: number) {
   const min = Math.min(...values), max = Math.max(...values), span = Math.max(1, max - min);
   return values.map((value, index) => ({ x: ((index + 0.5) * 440) / values.length, y: bottom - ((value - min) / span) * (bottom - top) }));
@@ -151,13 +38,16 @@ function TemperatureLine({ points, color }: { points: Array<{ x: number; y: numb
 }
 
 export default async function PortraitWeather() {
-  const dashboard = await getDashboard();
+  const loaded = await loadPortraitDashboard();
+  const dashboard = loaded.data;
+  const manifest = createRenderManifest('portrait', loaded.source, dashboard);
   const DayIcon = weatherIcons[dashboard.day.kind], NightIcon = weatherIcons[dashboard.night.kind];
   const highPoints = seriesPoints(dashboard.forecast.map((item) => item.high), 14, 30);
   const lowPoints = seriesPoints(dashboard.forecast.map((item) => item.low), 50, 68);
-  const hourly = dashboard.hourly.length === 13 ? dashboard.hourly : fallback.hourly;
+  const hourly = dashboard.hourly.length === 13 ? dashboard.hourly : fallbackPortrait.hourly;
   return (
     <main className="portrait-stage grid min-h-screen min-w-[480px] place-items-center bg-white font-sans text-black">
+      <script id="render-monitor-manifest" type="application/json" dangerouslySetInnerHTML={{ __html: serializeRenderManifest(manifest) }} />
       <section className="epaper-portrait flex h-[800px] w-[480px] flex-col gap-1.5 overflow-hidden rounded-none border-2 border-black bg-white p-2" aria-label={`Portrait ${dashboard.city} weather dashboard`}>
         <section className="h-[184px] shrink-0 overflow-hidden rounded-2xl border border-[#555] bg-white p-2" aria-label="Current weather">
           <header className="flex h-5 items-center justify-between text-xs font-semibold"><h1 className="tracking-wide">CURRENT</h1><p className="text-[10px] text-[#555]">{dashboard.city.toUpperCase()} · {dashboard.dateLabel}</p></header>

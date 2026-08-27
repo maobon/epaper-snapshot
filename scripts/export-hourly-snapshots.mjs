@@ -1,14 +1,19 @@
 import { spawn } from 'node:child_process';
 import { constants } from 'node:fs';
-import { access, mkdir, mkdtemp, open, readFile, rename, rm, stat } from 'node:fs/promises';
+import { access, appendFile, mkdir, mkdtemp, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ColorType, decode } from '@cf-wasm/png/node';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = dirname(SCRIPT_DIR);
 const SNAPSHOT_DIR = join(SITE_DIR, 'snapshot');
+const LOG_DIR = join(SITE_DIR, 'logs');
 const LOCK_FILE = join(SNAPSHOT_DIR, '.hourly-export.lock');
+const REPORT_FILE = join(LOG_DIR, 'monitor-report.json');
+const INFO_LOG_FILE = join(LOG_DIR, 'hourly-export.log');
+const ERROR_LOG_FILE = join(LOG_DIR, 'hourly-export-error.log');
 const PORT = process.env.PORT || '3001';
 const BASE_URL = process.env.EPAPER_BASE_URL || `http://127.0.0.1:${PORT}`;
 const PATH_DIRS = (process.env.PATH || '').split(delimiter).filter(Boolean);
@@ -32,6 +37,27 @@ const PAGES = [
   { name: 'portrait', route: '/portrait', width: 480, height: 800, marker: 'HOURLY AQI FORECAST' },
   { name: 'forecast-15d', route: '/forecast-15d', width: 480, height: 800, marker: '15-DAY FORECAST' },
 ];
+const REQUIRE_LIVE_DATA = !['0', 'false', 'no'].includes((process.env.EPAPER_REQUIRE_LIVE_DATA || 'true').toLowerCase());
+
+async function ensureLogFiles() {
+  await mkdir(LOG_DIR, { recursive: true });
+  await Promise.all([appendFile(INFO_LOG_FILE, ''), appendFile(ERROR_LOG_FILE, '')]);
+}
+
+async function writeLog(path, message) {
+  await ensureLogFiles();
+  await appendFile(path, `[${new Date().toISOString()}] ${message}\n`);
+}
+
+async function logInfo(message) {
+  console.log(message);
+  await writeLog(INFO_LOG_FILE, message);
+}
+
+async function logError(message) {
+  console.error(message);
+  await writeLog(ERROR_LOG_FILE, message);
+}
 
 function hourKey(date = new Date()) {
   return date.toISOString().slice(0, 13).replaceAll(/[-T:]/g, '');
@@ -68,12 +94,38 @@ async function expectedSiteIsReady() {
 
 async function verifyPng(path, width, height) {
   const image = await readFile(path);
+  verifyPngBuffer(image, width, height, path);
+}
+
+function verifyPngBuffer(image, width, height, label) {
   const signature = image.subarray(0, 8).toString('hex');
-  if (signature !== '89504e470d0a1a0a') throw new Error(`${path} is not a PNG file`);
+  if (signature !== '89504e470d0a1a0a') throw new Error(`${label} is not a PNG file`);
   const actualWidth = image.readUInt32BE(16);
   const actualHeight = image.readUInt32BE(20);
   if (actualWidth !== width || actualHeight !== height) {
-    throw new Error(`${path} is ${actualWidth}x${actualHeight}; expected ${width}x${height}`);
+    throw new Error(`${label} is ${actualWidth}x${actualHeight}; expected ${width}x${height}`);
+  }
+}
+
+function verifyFourGrayPixels(image, label) {
+  const decoded = decode(image);
+  if (decoded.colorType !== ColorType.RGBA) throw new Error(`${label} is not an RGBA PNG`);
+  const allowed = new Set([0, 85, 170, 255]);
+  for (let offset = 0; offset < decoded.image.length; offset += 4) {
+    const red = decoded.image[offset];
+    if (red !== decoded.image[offset + 1] || red !== decoded.image[offset + 2] || decoded.image[offset + 3] !== 255 || !allowed.has(red)) {
+      throw new Error(`${label} contains a pixel outside the declared 0/85/170/255 opaque grayscale palette`);
+    }
+  }
+}
+
+function parseRenderManifest(html, label) {
+  const match = html.match(/<script\b[^>]*\bid="render-monitor-manifest"[^>]*>([\s\S]*?)<\/script>/i);
+  if (!match) throw new Error(`${label} omitted the render monitor manifest`);
+  try {
+    return JSON.parse(match[1]);
+  } catch (error) {
+    throw new Error(`${label} returned an invalid render monitor manifest: ${error.message}`);
   }
 }
 
@@ -93,6 +145,7 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
     '--force-device-scale-factor=1',
     `--window-size=${page.width},${page.height}`,
     '--virtual-time-budget=3000',
+    '--dump-dom',
     `--user-data-dir=${profileDir}`,
     `--screenshot=${temporaryPath}`,
     targetUrl,
@@ -100,12 +153,17 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
   const child = spawn(chromePath, chromeArgs, {
     cwd: SITE_DIR,
     detached: true,
-    stdio: ['ignore', 'ignore', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
 
   let processError;
   let processExit;
+  let chromeStdout = '';
   let chromeStderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk) => {
+    chromeStdout = `${chromeStdout}${chunk}`;
+  });
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', (chunk) => {
     chromeStderr = `${chromeStderr}${chunk}`.slice(-16_384);
@@ -124,9 +182,9 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
         if (fileStat.size > 24 && fileStat.size === previousSize) stableReads += 1;
         else stableReads = 0;
         previousSize = fileStat.size;
-        if (stableReads >= 2) {
+        if (stableReads >= 2 && chromeStdout.includes('render-monitor-manifest')) {
           await verifyPng(temporaryPath, page.width, page.height);
-          return;
+          return chromeStdout;
         }
       } catch (error) {
         if (error?.code !== 'ENOENT') throw error;
@@ -137,7 +195,7 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
       }
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    throw new Error(`Chrome did not finish ${page.route} within 25 seconds`);
+    throw new Error(`Chrome did not finish ${page.route} with its data manifest within 25 seconds`);
   } finally {
     if (child.pid && !processExit) {
       try { process.kill(-child.pid, 'SIGTERM'); } catch { /* browser already stopped */ }
@@ -157,12 +215,43 @@ async function exportPage(chromePath, page, refreshKey) {
 
   const profileDir = await mkdtemp(join(tmpdir(), `weather-epaper-${page.name}-`));
   try {
-    await capturePage(chromePath, profileDir, temporaryPath, page, targetUrl);
+    const renderedHtml = await capturePage(chromePath, profileDir, temporaryPath, page, targetUrl);
+    const pageManifest = parseRenderManifest(renderedHtml, page.route);
+    const imageResponse = await fetch(`${BASE_URL}/api/image/${page.name}.png?monitorHour=${refreshKey}`, { cache: 'no-store' });
+    if (!imageResponse.ok) throw new Error(`/api/image/${page.name}.png returned ${imageResponse.status}`);
+    const imageBytes = Buffer.from(await imageResponse.arrayBuffer());
+    verifyPngBuffer(imageBytes, page.width, page.height, `/api/image/${page.name}.png`);
+    verifyFourGrayPixels(imageBytes, `/api/image/${page.name}.png`);
+    const imageManifest = {
+      source: imageResponse.headers.get('x-render-data-source'),
+      fingerprint: imageResponse.headers.get('x-render-data-fingerprint'),
+    };
+    if (pageManifest.view !== page.name) throw new Error(`${page.route} manifest identifies itself as ${pageManifest.view}`);
+    if (pageManifest.fingerprint !== imageManifest.fingerprint) {
+      throw new Error(`${page.name} screenshot data ${pageManifest.fingerprint} differs from image API data ${imageManifest.fingerprint}`);
+    }
+    if (pageManifest.source !== imageManifest.source) {
+      throw new Error(`${page.name} screenshot source ${pageManifest.source} differs from image API source ${imageManifest.source}`);
+    }
+    if (REQUIRE_LIVE_DATA && pageManifest.source !== 'live') {
+      throw new Error(`${page.name} used fallback data instead of a live server response`);
+    }
+    if (imageResponse.headers.get('x-epaper-gray-levels') !== '0,85,170,255') {
+      throw new Error(`/api/image/${page.name}.png omitted the four-level grayscale declaration`);
+    }
     await rename(temporaryPath, outputPath);
-    return outputPath;
+    return { name: page.name, route: page.route, outputPath, source: pageManifest.source, fingerprint: pageManifest.fingerprint, width: page.width, height: page.height, status: 'passed' };
   } finally {
+    await rm(temporaryPath, { force: true });
     await rm(profileDir, { recursive: true, force: true });
   }
+}
+
+async function writeReport(report) {
+  await mkdir(LOG_DIR, { recursive: true });
+  const temporaryPath = join(LOG_DIR, `.monitor-report-${process.pid}.json`);
+  await writeFile(temporaryPath, `${JSON.stringify(report, null, 2)}\n`);
+  await rename(temporaryPath, REPORT_FILE);
 }
 
 async function acquireLock() {
@@ -179,9 +268,10 @@ async function acquireLock() {
 }
 
 async function main() {
+  await ensureLogFiles();
   const lock = await acquireLock();
   if (!lock) {
-    console.log('An hourly snapshot export is already running.');
+    await logInfo('An hourly snapshot export is already running.');
     return;
   }
 
@@ -191,21 +281,28 @@ async function main() {
       throw new Error(`The production site is not available at ${BASE_URL}. Start it before running the scheduled export.`);
     }
     const chromePath = await findChrome();
-    console.log(`Using Chrome executable: ${chromePath}`);
+    await logInfo(`Using Chrome executable: ${chromePath}`);
     if (typeof process.getuid === 'function' && process.getuid() === 0) {
-      console.warn('Running Chrome as root; sandbox is disabled for the snapshot process. Prefer a non-root service user in production.');
+      await logInfo('WARNING: Running Chrome as root; sandbox is disabled for the snapshot process. Prefer a non-root service user in production.');
     }
     const refreshKey = hourKey();
-    const exported = [];
-    for (const page of PAGES) exported.push(await exportPage(chromePath, page, refreshKey));
-    console.log(`[${new Date().toISOString()}] Exported ${exported.length} front-end images for hour ${refreshKey}.`);
+    const checks = [];
+    try {
+      for (const page of PAGES) checks.push(await exportPage(chromePath, page, refreshKey));
+      await writeReport({ status: 'passed', checkedAt: new Date().toISOString(), hour: refreshKey, baseUrl: BASE_URL, requireLiveData: REQUIRE_LIVE_DATA, checks });
+      await logInfo(`Exported and verified ${checks.length} front-end images for hour ${refreshKey}.`);
+    } catch (error) {
+      await writeReport({ status: 'failed', checkedAt: new Date().toISOString(), hour: refreshKey, baseUrl: BASE_URL, requireLiveData: REQUIRE_LIVE_DATA, checks, error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
   } finally {
     await lock.close();
     await rm(LOCK_FILE, { force: true });
   }
 }
 
-main().catch((error) => {
-  console.error(`[${new Date().toISOString()}] Hourly snapshot export failed:`, error);
+main().catch(async (error) => {
+  const detail = error instanceof Error ? (error.stack || error.message) : String(error);
+  await logError(`Hourly snapshot export failed: ${detail}`);
   process.exitCode = 1;
 });

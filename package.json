@@ -11,6 +11,7 @@
     "build": "next build",
     "start": "node --env-file-if-exists=.env scripts/start-server.mjs start",
     "lint": "eslint .",
+    "monitor": "node --env-file-if-exists=.env scripts/export-hourly-snapshots.mjs",
     "snapshots:export": "node --env-file-if-exists=.env scripts/export-hourly-snapshots.mjs"
   },
   "dependencies": {

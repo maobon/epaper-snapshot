@@ -1,5 +1,6 @@
 const FRANKFURTER_RATES_URL = 'https://api.frankfurter.dev/v2/rates';
 const RANGE_DAYS = 30;
+const CACHE_TTL_MS = Math.max(1_000, Number(process.env.EXCHANGE_RATE_CACHE_TTL_MS) || 300_000);
 
 type FrankfurterRate = {
   date?: string;
@@ -18,11 +19,32 @@ export type ExchangeRateSeries = {
   points: ExchangeRatePoint[];
 };
 
+type ExchangeRateCacheEntry = { expiresAt: number; promise: Promise<ExchangeRateSeries> };
+const exchangeRateCacheGlobal = globalThis as typeof globalThis & {
+  __weatherEpaperExchangeRateCache?: ExchangeRateCacheEntry;
+};
+
 function formatDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
 export async function fetchMonthlyUsdCnh(): Promise<ExchangeRateSeries> {
+  const cachedRates = exchangeRateCacheGlobal.__weatherEpaperExchangeRateCache;
+  if (cachedRates && cachedRates.expiresAt > Date.now()) return cachedRates.promise;
+  const promise = fetchMonthlyUsdCnhUncached();
+  exchangeRateCacheGlobal.__weatherEpaperExchangeRateCache = {
+    expiresAt: (Math.floor(Date.now() / CACHE_TTL_MS) + 1) * CACHE_TTL_MS,
+    promise,
+  };
+  promise.catch(() => {
+    if (exchangeRateCacheGlobal.__weatherEpaperExchangeRateCache?.promise === promise) {
+      exchangeRateCacheGlobal.__weatherEpaperExchangeRateCache = undefined;
+    }
+  });
+  return promise;
+}
+
+async function fetchMonthlyUsdCnhUncached(): Promise<ExchangeRateSeries> {
   const endDate = new Date();
   const startDate = new Date(endDate);
   startDate.setUTCDate(endDate.getUTCDate() - (RANGE_DAYS - 1));
@@ -39,7 +61,7 @@ export async function fetchMonthlyUsdCnh(): Promise<ExchangeRateSeries> {
     headers: {
       Accept: 'application/json',
     },
-    cache: 'no-store',
+    next: { revalidate: Math.ceil(CACHE_TTL_MS / 1_000) },
   });
   if (!response.ok) throw new Error(`Frankfurter returned ${response.status}`);
 

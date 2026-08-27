@@ -7,8 +7,9 @@ import { CloudSnowIcon } from '@phosphor-icons/react/dist/ssr/CloudSnow';
 import { CloudSunIcon } from '@phosphor-icons/react/dist/ssr/CloudSun';
 import { MoonStarsIcon } from '@phosphor-icons/react/dist/ssr/MoonStars';
 import { SunIcon } from '@phosphor-icons/react/dist/ssr/Sun';
-import { fetchHourlyWeather } from '@/lib/weather-api';
-import { getWeatherPresentation, type WeatherDisplayKind } from '@/lib/weather-presentation';
+import { createRenderManifest, serializeRenderManifest } from '@/lib/render-monitor';
+import { loadLandscapeDashboard, type LandscapeDashboard } from '@/lib/weather-dashboard';
+import type { WeatherDisplayKind } from '@/lib/weather-presentation';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,69 +29,6 @@ export const metadata: Metadata = {
   },
 };
 
-type ApiHourly = {
-  temp?: number;
-  rainprobability?: number;
-  humidity?: number;
-  ws?: number;
-  time?: string;
-  showHour?: string;
-  icon?: string;
-  weaType?: string;
-  isdaynight?: boolean;
-};
-type ApiCondition = { weaIcon?: string };
-type ApiDay = {
-  publicDate?: string;
-  maxtemp?: number;
-  mintemp?: number;
-  dayWeaName?: string;
-  dayWeaIcon?: string;
-  conditionDay?: ApiCondition;
-};
-type HourlyData = {
-  currentTime?: string;
-  cityInfo?: { localizedName?: string; englishName?: string; name?: string };
-  actual?: {
-    temperature?: number;
-    humidity?: number;
-    windspeed?: number;
-    weaName?: string;
-    weaIcon?: string;
-  };
-  hourly?: ApiHourly[];
-  days?: { dailyWeathers?: ApiDay[] };
-};
-type ForecastDay = { day: string; high: number; low: number; kind: WeatherDisplayKind; selected?: boolean };
-type Dashboard = {
-  city: string;
-  dateLabel: string;
-  current: { temp: number; kind: WeatherDisplayKind; condition: string; rain: number; humidity: number; wind: number };
-  hourly: Array<{ time: string; temp: number }>;
-  forecast: ForecastDay[];
-};
-
-const fallbackHourly = [22, 25, 25, 25, 24, 24, 22, 22, 23, 24, 24, 25, 26, 26, 27, 27, 27, 27, 26, 25, 25, 25, 24, 24].map(
-  (temp, index) => ({ time: `${String((22 + index) % 24).padStart(2, '0')}:00`, temp }),
-);
-const fallbackForecast: ForecastDay[] = [
-  { day: 'Tue', high: 30, low: 22, kind: 'rain', selected: true },
-  { day: 'Wed', high: 27, low: 21, kind: 'cloudy' },
-  { day: 'Thu', high: 29, low: 21, kind: 'cloudy' },
-  { day: 'Fri', high: 24, low: 19, kind: 'rain' },
-  { day: 'Sat', high: 29, low: 19, kind: 'sunny' },
-  { day: 'Sun', high: 31, low: 19, kind: 'sunny' },
-  { day: 'Mon', high: 29, low: 20, kind: 'sunny' },
-  { day: 'Tue', high: 29, low: 19, kind: 'sunny' },
-];
-const fallback: Dashboard = {
-  city: 'Beijing',
-  dateLabel: 'TUE · 22:25',
-  current: { temp: 22, kind: 'partly-small', condition: 'Partly cloudy', rain: 9, humidity: 92, wind: 10 },
-  hourly: fallbackHourly,
-  forecast: fallbackForecast,
-};
-
 const weatherIcons = {
   sunny: SunIcon,
   'night-clear': MoonStarsIcon,
@@ -102,69 +40,6 @@ const weatherIcons = {
   cloudy: CloudIcon,
 };
 
-function formatCurrentTime(value: string) {
-  const [date = '2026-08-25', time = '22:25:00'] = value.split(' ');
-  const parsed = new Date(`${date}T12:00:00+08:00`);
-  const weekday = parsed.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'Asia/Shanghai' }).toUpperCase();
-  return `${weekday} · ${time.slice(0, 5)}`;
-}
-
-function formatWeekday(value?: string) {
-  if (!value) return '—';
-  return new Date(`${value}T12:00:00+08:00`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'Asia/Shanghai' });
-}
-
-async function getDashboard(): Promise<Dashboard> {
-  try {
-    const data = await fetchHourlyWeather<HourlyData>();
-    if (!data?.actual || !data.currentTime) throw new Error('Hourly weather source omitted current conditions');
-
-    const sourceHourly = data.hourly ?? [];
-    const currentHour = sourceHourly[0];
-    const currentWeather = getWeatherPresentation(
-      data.actual.weaName ?? currentHour?.weaType,
-      data.actual.weaIcon ?? currentHour?.icon,
-      currentHour?.isdaynight ?? false,
-    );
-    const sourceDays = data.days?.dailyWeathers ?? [];
-    const currentDate = data.currentTime.slice(0, 10);
-    const currentDayIndex = sourceDays.findIndex((item) => item.publicDate === currentDate);
-    const forecastSource = currentDayIndex >= 0 ? sourceDays.slice(currentDayIndex, currentDayIndex + 8) : [];
-    const forecast = forecastSource.map((item, index) => {
-      const weather = getWeatherPresentation(item.dayWeaName, item.dayWeaIcon ?? item.conditionDay?.weaIcon, true);
-      return {
-        day: formatWeekday(item.publicDate),
-        high: item.maxtemp ?? 0,
-        low: item.mintemp ?? 0,
-        kind: weather.kind,
-        selected: index === 0,
-      } satisfies ForecastDay;
-    });
-    const hourly = sourceHourly.slice(0, 24).map((item, index) => ({
-      time: item.showHour === '现在' ? 'Now' : item.time?.slice(11, 16) ?? `${String(index).padStart(2, '0')}:00`,
-      temp: item.temp ?? 0,
-    }));
-
-    return {
-      city: data.cityInfo?.localizedName ?? data.cityInfo?.englishName ?? data.cityInfo?.name ?? fallback.city,
-      dateLabel: formatCurrentTime(data.currentTime),
-      current: {
-        temp: data.actual.temperature ?? fallback.current.temp,
-        kind: currentWeather.kind,
-        condition: currentWeather.label,
-        rain: currentHour?.rainprobability ?? fallback.current.rain,
-        humidity: data.actual.humidity ?? currentHour?.humidity ?? fallback.current.humidity,
-        wind: data.actual.windspeed ?? currentHour?.ws ?? fallback.current.wind,
-      },
-      hourly: hourly.length === 24 ? hourly : fallback.hourly,
-      forecast: forecast.length === 8 ? forecast : fallback.forecast,
-    };
-  } catch (error) {
-    console.error('Unable to load hourly weather data:', error);
-    return fallback;
-  }
-}
-
 function WeatherIcon({ kind, inverted = false }: { kind: WeatherDisplayKind; inverted?: boolean }) {
   const Icon = weatherIcons[kind];
   return (
@@ -174,7 +49,7 @@ function WeatherIcon({ kind, inverted = false }: { kind: WeatherDisplayKind; inv
   );
 }
 
-function makeChartPoints(hourly: Dashboard['hourly']) {
+function makeChartPoints(hourly: LandscapeDashboard['hourly']) {
   const temperatures = hourly.map((item) => item.temp);
   const min = Math.min(...temperatures);
   const max = Math.max(...temperatures);
@@ -186,7 +61,9 @@ function makeChartPoints(hourly: Dashboard['hourly']) {
 }
 
 export default async function LandscapeWeather() {
-  const dashboard = await getDashboard();
+  const loaded = await loadLandscapeDashboard();
+  const dashboard = loaded.data;
+  const manifest = createRenderManifest('landscape', loaded.source, dashboard);
   const CurrentIcon = weatherIcons[dashboard.current.kind];
   const chartPoints = makeChartPoints(dashboard.hourly);
   const highestTemperature = Math.max(...dashboard.hourly.map((item) => item.temp));
@@ -195,6 +72,7 @@ export default async function LandscapeWeather() {
 
   return (
     <main className="screen-stage grid min-h-screen min-w-[800px] place-items-center bg-white font-sans text-black">
+      <script id="render-monitor-manifest" type="application/json" dangerouslySetInnerHTML={{ __html: serializeRenderManifest(manifest) }} />
       <section className="epaper-landscape h-[480px] w-[800px] overflow-hidden rounded-none border-2 border-black bg-white p-3" aria-label={`${dashboard.city} weather dashboard`}>
         <header className="flex h-8 items-center justify-between">
           <div className="flex items-center rounded-full border border-[#555] bg-white px-3 py-1 text-sm font-semibold tracking-wide">

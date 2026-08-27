@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { fetchMonthlyUsdCnh, type ExchangeRatePoint } from '@/lib/exchange-rate-api';
+import { createRenderManifest, serializeRenderManifest } from '@/lib/render-monitor';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,12 +23,12 @@ const fallbackData: DashboardData = {
   ].map(([date, rate]) => ({ date: String(date), rate: Number(rate) })),
 };
 
-async function getDashboardData(): Promise<DashboardData> {
+async function getDashboardData(): Promise<{ data: DashboardData; source: 'live' | 'fallback' }> {
   try {
-    return await fetchMonthlyUsdCnh();
+    return { data: await fetchMonthlyUsdCnh(), source: 'live' };
   } catch (error) {
     console.error('Unable to load USD/CNH exchange rates:', error);
-    return fallbackData;
+    return { data: fallbackData, source: 'fallback' };
   }
 }
 
@@ -104,7 +105,9 @@ function rateLabelStyle(points: Array<{ x: number; y: number }>, index: number):
 }
 
 export default async function CurrencyDashboard() {
-  const dashboard = await getDashboardData();
+  const loaded = await getDashboardData();
+  const dashboard = loaded.data;
+  const manifest = createRenderManifest('currency', loaded.source, dashboard.points);
   const rates = dashboard.points.map((point) => point.rate);
   const currentRate = rates.at(-1) ?? 6.718;
   const chart = makeChartPoints(rates);
@@ -116,6 +119,7 @@ export default async function CurrencyDashboard() {
 
   return (
     <main className="currency-stage">
+      <script id="render-monitor-manifest" type="application/json" dangerouslySetInnerHTML={{ __html: serializeRenderManifest(manifest) }} />
       <section className="currency-screen" aria-label="USD to CNH one month exchange rate chart">
         <header className="currency-header">
           <div>
