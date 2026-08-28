@@ -27,12 +27,12 @@ button { font: inherit; }
   overflow: hidden;
   border: 2px solid var(--black);
   background: var(--white);
-  padding: 16px 8px 10px;
+  padding: 16px 8px 0;
 }
 
 .currency-header {
   display: flex;
-  height: 78px;
+  height: 48px;
   align-items: flex-start;
   justify-content: space-between;
 }
@@ -66,7 +66,7 @@ button { font: inherit; }
 }
 
 .currency-header p {
-  margin: 10px 0 0;
+  margin: 0;
   color: var(--dark);
   font-size: 14px;
   font-weight: 600;
@@ -84,24 +84,24 @@ button { font: inherit; }
   align-items: center;
   justify-content: flex-end;
   gap: 5px;
-  font-size: 17px;
+  font-size: 25px;
   white-space: nowrap;
 }
 
 .currency-quote time {
   display: block;
-  margin-top: 8px;
+  margin-top: 3px;
   color: var(--dark);
   font-size: 13px;
   font-weight: 600;
 }
 
-.currency-chart { height: 372px; }
+.currency-chart { height: 402px; }
 
 .currency-plot {
   position: relative;
   width: 768px;
-  height: 345px;
+  height: 375px;
 }
 
 .currency-grid-line {
@@ -122,6 +122,11 @@ button { font: inherit; }
   text-align: right;
   font-size: 11px;
   font-weight: 700;
+}
+
+.currency-grid-line:first-child span {
+  top: 10px;
+  bottom: auto;
 }
 
 .currency-chart-line {
@@ -150,12 +155,12 @@ button { font: inherit; }
 .currency-point-rate {
   position: absolute;
   z-index: 4;
-  min-width: 48px;
-  padding: 2px 3px;
+  min-width: 52px;
+  padding: 3px 4px;
   background: var(--white);
   color: var(--dark);
   text-align: center;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
   font-weight: 700;
 }
@@ -165,13 +170,13 @@ button { font: inherit; }
   width: 768px;
   height: 27px;
   color: var(--dark);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
 }
 
 .currency-dates span {
   position: absolute;
-  top: 7px;
+  top: 22px;
   white-space: nowrap;
 }
 
@@ -283,6 +288,17 @@ button { font: inherit; }
   height: auto;
   min-height: 0;
 }
+
+/* The 15-day screen is viewed at native 480 px width, so keep every data point
+   comfortably readable without changing the fixed 15-row layout. */
+.epaper-forecast15 .forecast15-title { font-size: 19px; }
+.epaper-forecast15 .forecast15-header .forecast15-subtitle { font-size: 11px; }
+.epaper-forecast15 .forecast15-day { font-size: 16px; line-height: 1.05; }
+.epaper-forecast15 .forecast15-date { font-size: 14px; line-height: 1.05; }
+.epaper-forecast15 .forecast15-temperature { font-size: 16px; line-height: 1.1; }
+.epaper-forecast15 .forecast15-rain { font-size: 14px; line-height: 1.1; }
+.epaper-forecast15 .forecast15-wind { font-size: 14px; line-height: 1.1; }
+.epaper-forecast15 .forecast15-condition { font-size: 12px; line-height: 1.1; }
 
 @media (max-width: 799px), (max-height: 479px) {
   .screen-stage, .portrait-stage { place-items: start; }

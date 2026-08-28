@@ -43,7 +43,7 @@ const weatherIcons = {
 function WeatherIcon({ kind, inverted = false }: { kind: WeatherDisplayKind; inverted?: boolean }) {
   const Icon = weatherIcons[kind];
   return (
-    <span className="mt-1 flex h-[57px] w-[70px] items-center justify-center" aria-hidden="true">
+    <span className="mt-3 flex h-[57px] w-[70px] items-center justify-center" aria-hidden="true">
       <Icon color={inverted ? '#fff' : '#000'} size={54} weight="light" />
     </span>
   );
@@ -104,9 +104,8 @@ export default async function LandscapeWeather() {
         </section>
 
         <section className="mt-2 h-[154px] rounded-2xl border border-[#555] bg-white px-3 py-2" aria-label="Hourly temperature forecast">
-          <div className="flex h-6 items-center justify-between">
+          <div className="flex h-6 items-center">
             <h2 className="text-sm font-semibold tracking-tight">Next 24 hours</h2>
-            <span className="rounded-md bg-black px-2 py-0.5 text-[10px] font-semibold text-white">TEMPERATURE</span>
           </div>
           <div className="relative h-[82px] w-[746px] overflow-visible border-b border-[#aaa]">
             <div className="chart-area" style={{ clipPath: `polygon(${areaPoints})` }} />
@@ -135,7 +134,6 @@ export default async function LandscapeWeather() {
           {dashboard.forecast.map((item, index) => (
             <article className={`flex h-[142px] flex-col items-center rounded-xl border px-1 pt-2 ${item.selected ? 'forecast-selected border-black bg-[#555] text-white' : 'border-[#aaa] bg-white text-black'}`} key={`${item.day}-${index}`} aria-label={`${item.day}, high ${item.high} degrees, low ${item.low} degrees`}>
               <h2 className="text-base leading-none font-semibold tracking-tight">{item.day}</h2>
-              <p className={`mt-1 text-[10px] font-medium tracking-wide uppercase ${item.selected ? 'text-[#aaa]' : 'text-[#555]'}`}>{item.selected ? 'Today' : 'Forecast'}</p>
               <WeatherIcon inverted={item.selected} kind={item.kind} />
               <p className={`mt-auto mb-2 flex gap-1.5 text-sm ${item.selected ? 'text-[#aaa]' : 'text-[#555]'}`}><strong className={`font-semibold ${item.selected ? 'text-white' : 'text-black'}`}>{item.high}°</strong><span>{item.low}°</span></p>
             </article>

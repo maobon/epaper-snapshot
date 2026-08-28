@@ -5,7 +5,7 @@
 这里的职责分为两部分：
 
 - `pnpm start`：常驻运行 Next.js Web 服务，应交给 systemd、Supervisor 或 PM2 等进程管理器守护。
-- `pnpm snapshots:export`（或 `pnpm monitor`）：由系统定时任务在每个整点调用，连接已经运行的 Web 服务，更新四张墨水屏截图，并校验截图数据与图片 API 使用的服务端响应一致。
+- `pnpm snapshots:export`：由系统定时任务在每个整点调用，连接已经运行的 Web 服务，更新四张墨水屏截图，并校验截图数据与图片 API 使用的服务端响应一致。
 
 定时任务不会自行启动开发服务器。如果 Web 服务不可用，它会返回失败，便于监控发现部署问题。
 

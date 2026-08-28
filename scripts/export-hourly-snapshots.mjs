@@ -7,9 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { ColorType, decode } from '@cf-wasm/png/node';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const SITE_DIR = dirname(SCRIPT_DIR);
-const SNAPSHOT_DIR = join(SITE_DIR, 'snapshot');
-const LOG_DIR = join(SITE_DIR, 'logs');
+const PROJECT_DIR = dirname(SCRIPT_DIR);
+const SNAPSHOT_DIR = join(PROJECT_DIR, 'snapshot');
+const LOG_DIR = join(PROJECT_DIR, 'logs');
 const LOCK_FILE = join(SNAPSHOT_DIR, '.hourly-export.lock');
 const REPORT_FILE = join(LOG_DIR, 'monitor-report.json');
 const INFO_LOG_FILE = join(LOG_DIR, 'hourly-export.log');
@@ -83,7 +83,7 @@ async function findChrome() {
   );
 }
 
-async function expectedSiteIsReady() {
+async function expectedAppIsReady() {
   try {
     const response = await fetch(`${BASE_URL}/currency?snapshotProbe=${Date.now()}`, { cache: 'no-store' });
     if (!response.ok) return false;
@@ -195,7 +195,7 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
     targetUrl,
   ];
   const child = spawn(chromePath, chromeArgs, {
-    cwd: SITE_DIR,
+    cwd: PROJECT_DIR,
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -325,8 +325,8 @@ async function main() {
 
   try {
     await lock.writeFile(`${new Date().toISOString()}\n`);
-    if (!(await expectedSiteIsReady())) {
-      throw new Error(`The production site is not available at ${BASE_URL}. Start it before running the scheduled export.`);
+    if (!(await expectedAppIsReady())) {
+      throw new Error(`The production app is not available at ${BASE_URL}. Start it before running the scheduled export.`);
     }
     const chromePath = await findChrome();
     await logInfo(`Using Chrome executable: ${chromePath}`);

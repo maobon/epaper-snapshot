@@ -4,8 +4,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const SITE_DIR = dirname(SCRIPT_DIR);
-const NEXT_PATH = join(SITE_DIR, 'node_modules', 'next', 'dist', 'bin', 'next');
+const PROJECT_DIR = dirname(SCRIPT_DIR);
+const NEXT_PATH = join(PROJECT_DIR, 'node_modules', 'next', 'dist', 'bin', 'next');
 const MODE = process.argv[2];
 const PORT = process.env.PORT || '3001';
 const HOST = process.env.EPAPER_HOST || '0.0.0.0';
@@ -22,7 +22,7 @@ await access(NEXT_PATH);
 console.log(`Starting Next.js ${MODE} server at http://${HOST}:${PORT}`);
 
 const server = spawn(process.execPath, [NEXT_PATH, MODE, '--port', PORT, '--hostname', HOST], {
-  cwd: SITE_DIR,
+  cwd: PROJECT_DIR,
   env: process.env,
   stdio: 'inherit',
 });

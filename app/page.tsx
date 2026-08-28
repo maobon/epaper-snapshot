@@ -62,7 +62,7 @@ function makeChartPoints(values: number[]) {
     low,
     points: values.map((value, index) => ({
       x: (index * 768) / Math.max(1, values.length - 1),
-      y: 4 + ((high - value) / span) * 337,
+      y: 4 + ((high - value) / span) * 367,
     })),
   };
 }
@@ -96,7 +96,7 @@ function rateLabelStyle(points: Array<{ x: number; y: number }>, index: number):
   const upperLineY = Math.min(...nearbyLineYs);
   const lowerLineY = Math.max(...nearbyLineYs);
   const spaceAbove = upperLineY - 4;
-  const spaceBelow = 341 - lowerLineY;
+  const spaceBelow = 371 - lowerLineY;
   const placeBelow = spaceAbove < 24 && spaceBelow > spaceAbove;
 
   return placeBelow
@@ -138,7 +138,7 @@ export default async function CurrencyDashboard() {
         <section className="currency-chart" aria-label={`One month exchange rate, currently ${currentRate.toFixed(4)} CNH per US dollar`}>
           <div className="currency-plot">
             {levels.map((level, index) => (
-              <div className="currency-grid-line" key={level} style={{ top: 4 + index * (337 / 4) }}>
+              <div className="currency-grid-line" key={level} style={{ top: 4 + index * (367 / 4) }}>
                 <span>{level.toFixed(4)}</span>
               </div>
             ))}
@@ -151,7 +151,7 @@ export default async function CurrencyDashboard() {
                 <b
                   className="currency-point-rate"
                   key={`rate-${dashboard.points[pointIndex].date}`}
-                  style={{ left: Math.min(744, Math.max(24, point.x)), ...rateLabelStyle(chart.points, pointIndex) }}
+                  style={{ left: Math.min(742, Math.max(26, point.x)), ...rateLabelStyle(chart.points, pointIndex) }}
                 >
                   {dashboard.points[pointIndex].rate.toFixed(4)}
                 </b>
