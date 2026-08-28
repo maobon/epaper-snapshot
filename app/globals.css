@@ -155,12 +155,12 @@ button { font: inherit; }
 .currency-point-rate {
   position: absolute;
   z-index: 4;
-  min-width: 52px;
+  min-width: 64px;
   padding: 3px 4px;
   background: var(--white);
   color: var(--dark);
   text-align: center;
-  font-size: 12px;
+  font-size: 15px;
   line-height: 1;
   font-weight: 700;
 }
@@ -176,7 +176,7 @@ button { font: inherit; }
 
 .currency-dates span {
   position: absolute;
-  top: 22px;
+  top: 7px;
   white-space: nowrap;
 }
 
@@ -246,6 +246,11 @@ button { font: inherit; }
 
 .epaper-landscape .chart-line { height: 2px; }
 
+.forecast-selected {
+  background-color: var(--white);
+  background-image: repeating-linear-gradient(135deg, transparent 0, transparent 6px, var(--light) 6px, var(--light) 7px);
+}
+
 .chart-area {
   position: absolute;
   inset: 0;
@@ -276,7 +281,7 @@ button { font: inherit; }
 
 .forecast15-columns {
   display: grid;
-  grid-template-columns: 86px 64px 102px 86px minmax(0, 1fr);
+  grid-template-columns: 82px 58px 94px 66px minmax(0, 1fr);
   column-gap: 4px;
 }
 
@@ -296,9 +301,26 @@ button { font: inherit; }
 .epaper-forecast15 .forecast15-day { font-size: 16px; line-height: 1.05; }
 .epaper-forecast15 .forecast15-date { font-size: 14px; line-height: 1.05; }
 .epaper-forecast15 .forecast15-temperature { font-size: 16px; line-height: 1.1; }
-.epaper-forecast15 .forecast15-rain { font-size: 14px; line-height: 1.1; }
-.epaper-forecast15 .forecast15-wind { font-size: 14px; line-height: 1.1; }
-.epaper-forecast15 .forecast15-condition { font-size: 12px; line-height: 1.1; }
+.epaper-forecast15 .forecast15-rain { font-size: 16px; line-height: 1.1; }
+.epaper-forecast15 .forecast15-wind { font-size: 16px; line-height: 1.1; }
+.epaper-forecast15 .forecast15-condition { font-size: 14px; line-height: 1.1; }
+
+.epaper-portrait .portrait-forecast-condition {
+  display: flex;
+  height: 2.4em;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.epaper-portrait .portrait-forecast-condition > span {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 
 @media (max-width: 799px), (max-height: 479px) {
   .screen-stage, .portrait-stage { place-items: start; }

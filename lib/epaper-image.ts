@@ -54,6 +54,20 @@ function line(x1: number, y1: number, x2: number, y2: number, stroke = LIGHT, wi
   return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${width}"/>`;
 }
 
+function wrapTextLines(value: string, maxLineLength: number) {
+  const words = value.trim().split(/\s+/).flatMap((word) => {
+    if (word.length <= maxLineLength) return [word];
+    const splitAt = Math.ceil(word.length / 2);
+    return [word.slice(0, splitAt), word.slice(splitAt)];
+  });
+  return words.reduce<string[]>((lines, word) => {
+    const current = lines.at(-1);
+    if (!current || `${current} ${word}`.length > maxLineLength) lines.push(word);
+    else lines[lines.length - 1] = `${current} ${word}`;
+    return lines;
+  }, []).slice(0, 2);
+}
+
 function svgDocument(width: number, height: number, body: string) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="${WHITE}"/>${body}</svg>`;
 }
@@ -169,19 +183,19 @@ async function currencySvg() {
     }
     const upperLineY = Math.min(...nearbyLineYs), lowerLineY = Math.max(...nearbyLineYs);
     const placeBelow = upperLineY - 70 < 22 && 437 - lowerLineY > upperLineY - 70;
-    const labelX = Math.max(10, Math.min(738, point.x - 26));
-    const labelY = placeBelow ? lowerLineY + 8 : upperLineY - 24;
-    body += rect(labelX, labelY, 52, 16, 2, WHITE, WHITE, 0);
-    body += text(labelX + 26, labelY + 12, points[pointIndex].rate.toFixed(4), 11, 700, { anchor: 'middle', fill: DARK });
+    const labelX = Math.max(10, Math.min(726, point.x - 32));
+    const labelY = placeBelow ? lowerLineY + 8 : upperLineY - 29;
+    body += rect(labelX, labelY, 64, 21, 2, WHITE, WHITE, 0);
+    body += text(labelX + 32, labelY + 15, points[pointIndex].rate.toFixed(4), 15, 700, { anchor: 'middle', fill: DARK });
   });
-  labels.forEach((pointIndex, index) => { body += text(chart[pointIndex].x, 475, dateLabel(points[pointIndex].date), 9, 700, { anchor: index === 0 ? 'start' : index === labels.length - 1 ? 'end' : 'middle', fill: DARK }); });
+  labels.forEach((pointIndex, index) => { body += text(chart[pointIndex].x, 460, dateLabel(points[pointIndex].date), 9, 700, { anchor: index === 0 ? 'start' : index === labels.length - 1 ? 'end' : 'middle', fill: DARK }); });
   return { svg: svgDocument(800, 480, body), manifest: createRenderManifest('currency', source, points) };
 }
 
 async function landscapeSvg() {
   const loaded = await loadLandscapeDashboard();
   const data = loaded.data;
-  let body = rect(1, 1, 798, 478, 0, BLACK, WHITE, 2);
+  let body = '<defs><pattern id="forecast-selected-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#aaaaaa" stroke-width="1"/></pattern></defs>' + rect(1, 1, 798, 478, 0, BLACK, WHITE, 2);
   body += rect(15, 15, 84, 31, 16, DARK, WHITE, 2) + text(27, 36, data.city, 14, 700);
   body += text(698, 35, data.dateLabel, 12, 700, { anchor: 'end', fill: DARK });
   body += rect(706, 19, 79, 23, 12, BLACK, BLACK, 0) + text(745, 35, data.current.condition.toUpperCase(), 12, 700, { anchor: 'middle', fill: WHITE });
@@ -203,11 +217,11 @@ async function landscapeSvg() {
   data.forecast.forEach((day, index) => {
     const x = 15 + index * 97;
     const selected = index === 0;
-    body += rect(x, 325, 92, 141, 12, selected ? BLACK : LIGHT, selected ? DARK : WHITE, 2);
-    body += text(x + 46, 351, day.day, 16, 700, { anchor: 'middle', fill: selected ? WHITE : BLACK });
-    body += weatherIcon(day.kind, x + 24, 369, 44, selected ? WHITE : BLACK);
-    body += text(x + 35, 452, `${day.high}°`, 13, 700, { anchor: 'end', fill: selected ? WHITE : BLACK });
-    body += text(x + 41, 452, `${day.low}°`, 13, 400, { fill: selected ? LIGHT : DARK });
+    body += rect(x, 325, 92, 141, 12, selected ? BLACK : LIGHT, selected ? 'url(#forecast-selected-hatch)' : WHITE, 2);
+    body += text(x + 46, 351, day.day, 16, 700, { anchor: 'middle' });
+    body += weatherIcon(day.kind, x + 24, 369, 44, BLACK);
+    body += text(x + 43, 452, `${day.high}°`, 18, 700, { anchor: 'end' });
+    body += text(x + 52, 452, `${day.low}°`, 18, 400, { fill: DARK });
   });
   return { svg: svgDocument(800, 480, body), manifest: createRenderManifest('landscape', loaded.source, data) };
 }
@@ -222,23 +236,26 @@ async function portraitSvg() {
   let body = rect(1, 1, 478, 798, 0, BLACK, WHITE, 2);
   body += rect(10, 10, 460, 184, 14, DARK, WHITE, 2) + text(20, 34, 'CURRENT', 14, 700) + text(460, 34, `${data.city.toUpperCase()} · ${data.dateLabel}`, 11, 700, { anchor: 'end', fill: DARK });
   body += text(20, 106, data.day.temp, 68, 700) + text(91, 65, '°', 26, 700) + weatherIcon(data.day.kind, 201, 47, 48, DARK) + text(225, 111, data.day.condition.toUpperCase(), 12, 700, { anchor: 'middle' });
-  body += text(358, 70, `Wind ${data.day.wind} ${data.windUnit}`, 13, 700) + text(358, 94, `Gust · Level ${data.day.gustLevel}`, 13, 700);
+  body += text(358, 70, `Wind ${data.day.wind} ${data.windUnit}`, 15, 700) + text(358, 94, `Gust · Level ${data.day.gustLevel}`, 15, 700);
   body += line(20, 122, 460, 122, LIGHT, 1);
   const detail = [['FEELS LIKE', `${data.day.feels}°`], ['VISIBILITY', `${data.day.visibility} ${data.distanceUnit}`], ['UV INDEX', data.day.uv], ['CLOUD', `${data.day.cloud}%`]];
   detail.forEach(([label, value], index) => { const x = 20 + index * 110; if (index) body += line(x, 130, x, 184, LIGHT, 1); body += text(x + 10, 153, label, 9, 700, { fill: DARK, spacing: 0.5 }) + text(x + 10, 177, value, 14, 700); });
   body += rect(10, 201, 460, 96, 14, DARK, WHITE, 2) + sectionTitle(225, 'NIGHT', '18:00 — 06:00');
-  body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 170, 235, 38, DARK) + text(216, 265, data.night.condition.toUpperCase(), 10, 700) + text(358, 253, `Wind ${data.night.wind} ${data.windUnit}`, 13, 700) + text(358, 277, `Gust · Level ${data.night.gustLevel}`, 13, 700);
+  body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 170, 235, 38, DARK) + text(216, 265, data.night.condition.toUpperCase(), 10, 700) + text(358, 253, `Wind ${data.night.wind} ${data.windUnit}`, 15, 700) + text(358, 277, `Gust · Level ${data.night.gustLevel}`, 15, 700);
   body += rect(10, 304, 460, 123, 14, DARK, WHITE, 2) + sectionTitle(328, 'HOURLY AQI FORECAST', 'LIVE') + line(20, 410, 460, 410, LIGHT, 1);
   const aqi = data.hourly;
   aqi.forEach((item, index) => { const x = 40 + index * 33; const height = Math.max(14, Math.min(45, item.value * 0.45)); body += `<rect x="${x - 4}" y="${402 - height}" width="8" height="${height}" rx="3" fill="${index === 0 ? DARK : LIGHT}"/>` + text(x, 420, item.time, 9, 700, { anchor: 'middle', fill: DARK }); });
-  body += rect(10, 434, 460, 118, 14, DARK, WHITE, 2) + sectionTitle(458, 'LIFE INDEX', 'TODAY');
-  body += line(240, 466, 240, 542, LIGHT, 1) + line(20, 506, 230, 506, LIGHT, 1) + line(250, 506, 460, 506, LIGHT, 1);
-  Object.entries({ Dressing: data.life.dressing, 'Car wash': data.life.carWash, Sports: data.life.sports, Colds: data.life.colds }).forEach(([label, value], index) => { const col = index % 2, row = Math.floor(index / 2), x = 28 + col * 230, y = 487 + row * 40; body += text(x, y, label, 12, 700) + text(x, y + 15, value, 11, 400, { fill: DARK }); });
-  body += rect(10, 559, 460, 231, 14, DARK, WHITE, 2) + sectionTitle(583, '7-DAY FORECAST', 'LIVE');
+  body += rect(10, 434, 460, 356, 14, DARK, WHITE, 2) + sectionTitle(458, '7-DAY FORECAST', 'LIVE');
   const forecastX = (index: number) => 20 + ((index + 0.5) * 440) / data.forecast.length;
-  data.forecast.forEach((day, index) => { const x = forecastX(index); body += text(x, 601, day.date, 9, 700, { anchor: 'middle', fill: DARK }) + text(x, 616, day.day, 10, 700, { anchor: 'middle' }) + weatherIcon(day.kind, x - 14, 621, 28, DARK) + text(x, 667, day.condition.length > 10 ? day.condition.slice(0, 9) : day.condition, 9, 700, { anchor: 'middle' }) + text(x, 700, `${day.high}°`, 11, 700, { anchor: 'middle' }) + text(x, 743, `${day.low}°`, 10, 700, { anchor: 'middle', fill: DARK }) + text(x, 766, `${day.wind} · ${day.level}`, 9, 700, { anchor: 'middle' }); });
-  const high = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${718 - (day.high - Math.min(...data.forecast.map((item) => item.high))) * 3}`).join(' ');
-  const low = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${756 - (day.low - Math.min(...data.forecast.map((item) => item.low))) * 3}`).join(' ');
+  data.forecast.forEach((day, index) => {
+    const x = forecastX(index);
+    const conditionLines = wrapTextLines(day.condition, 11);
+    body += text(x, 499, day.date, 9, 700, { anchor: 'middle', fill: DARK }) + text(x, 522, day.day, 10, 700, { anchor: 'middle' }) + weatherIcon(day.kind, x - 16, 529, 32, DARK);
+    body += conditionLines.map((condition, lineIndex) => text(x, conditionLines.length === 1 ? 600 : 594 + lineIndex * 12, condition, 9, 700, { anchor: 'middle' })).join('');
+    body += text(x, 651, `${day.high}°`, 16, 700, { anchor: 'middle' }) + text(x, 735, `${day.low}°`, 16, 700, { anchor: 'middle', fill: DARK }) + text(x, 770, `${day.wind} · ${day.level}`, 9, 700, { anchor: 'middle' });
+  });
+  const high = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${679 - (day.high - Math.min(...data.forecast.map((item) => item.high))) * 4.5}`).join(' ');
+  const low = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${737 - (day.low - Math.min(...data.forecast.map((item) => item.low))) * 4.5}`).join(' ');
   body += `<path d="${high}" fill="none" stroke="${BLACK}" stroke-width="2"/><path d="${low}" fill="none" stroke="${LIGHT}" stroke-width="2"/>`;
   return { svg: svgDocument(480, 800, body), manifest: createRenderManifest('portrait', loaded.source, data) };
 }
@@ -251,10 +268,10 @@ async function forecast15Svg() {
   items.forEach((item, index) => {
     const y = 65 + index * (728 / 15);
     body += text(20, y + 18, item.day, 16, 700) + text(20, y + 35, item.date, 13, 700, { fill: DARK });
-    body += weatherIcon(item.kind, 108, y + 7, 30, DARK);
-    body += text(176, y + 24, `${item.high}°`, 16, 700) + text(213, y + 24, `/ ${item.low}°`, 15, 700, { fill: DARK });
-    body += text(282, y + 24, `${item.rain}%`, 14, 700);
-    body += text(460, y + 19, `${item.windDirection} · ${item.windSpeed} ${loaded.data.windSpeedUnit}`, 14, 700, { anchor: 'end' }) + text(460, y + 36, item.condition, 11, 700, { anchor: 'end', fill: DARK });
+    body += weatherIcon(item.kind, 104, y + 7, 30, DARK);
+    body += text(166, y + 24, `${item.high}°`, 16, 700) + text(203, y + 24, `/ ${item.low}°`, 15, 700, { fill: DARK });
+    body += text(264, y + 24, `${item.rain}%`, 16, 700);
+    body += text(460, y + 19, `${item.windDirection} · ${item.windSpeed} ${loaded.data.windSpeedUnit}`, 16, 700, { anchor: 'end' }) + text(460, y + 36, item.condition, 14, 700, { anchor: 'end', fill: DARK });
   });
   return { svg: svgDocument(480, 800, body), manifest: createRenderManifest('forecast-15d', loaded.source, loaded.data) };
 }
