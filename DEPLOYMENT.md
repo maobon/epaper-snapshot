@@ -33,6 +33,12 @@ command -v google-chrome-stable google-chrome chromium chromium-browser
 
 根据第二条命令的输出调整 `.env` 中的 `EPAPER_CHROME_PATH`。如果没有任何输出，请先安装 Google Chrome 或 Chromium。
 
+低配云主机上可以适当延长单页 Chrome 截图等待时间（默认 120 秒，最小 10 秒）。以下配置允许每个页面最多等待 180 秒；四个页面仍然串行处理，不会同时启动多个 Chrome 实例：
+
+```dotenv
+EPAPER_CHROME_TIMEOUT_MS=180000
+```
+
 ## 2. 安装与构建
 
 ```bash

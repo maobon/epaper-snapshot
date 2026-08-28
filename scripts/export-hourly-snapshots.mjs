@@ -16,6 +16,7 @@ const INFO_LOG_FILE = join(LOG_DIR, 'hourly-export.log');
 const ERROR_LOG_FILE = join(LOG_DIR, 'hourly-export-error.log');
 const PORT = process.env.PORT || '3001';
 const BASE_URL = process.env.EPAPER_BASE_URL || `http://127.0.0.1:${PORT}`;
+const CHROME_TIMEOUT_MS = Math.max(10_000, Number(process.env.EPAPER_CHROME_TIMEOUT_MS) || 120_000);
 const PATH_DIRS = (process.env.PATH || '').split(delimiter).filter(Boolean);
 const CHROME_NAMES = ['google-chrome-stable', 'google-chrome', 'chromium', 'chromium-browser'];
 const CHROME_CANDIDATES = [...new Set([
@@ -129,6 +130,49 @@ function parseRenderManifest(html, label) {
   }
 }
 
+function chromeProcessGroupExists(pid) {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ESRCH') return false;
+    throw error;
+  }
+}
+
+async function waitForChromeProcessGroup(pid, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!chromeProcessGroupExists(pid)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return !chromeProcessGroupExists(pid);
+}
+
+async function stopChromeProcessGroup(child) {
+  if (!child.pid || !chromeProcessGroupExists(child.pid)) return;
+
+  try { process.kill(-child.pid, 'SIGTERM'); } catch (error) {
+    if (error?.code !== 'ESRCH') throw error;
+  }
+  if (await waitForChromeProcessGroup(child.pid, 3_000)) return;
+
+  try { process.kill(-child.pid, 'SIGKILL'); } catch (error) {
+    if (error?.code !== 'ESRCH') throw error;
+  }
+  if (!(await waitForChromeProcessGroup(child.pid, 2_000))) {
+    throw new Error(`Chrome process group ${child.pid} did not exit after SIGKILL`);
+  }
+}
+
+async function removeChromeProfile(profileDir) {
+  try {
+    await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  } catch (error) {
+    await logError(`WARNING: Could not remove Chrome profile ${profileDir}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function capturePage(chromePath, profileDir, temporaryPath, page, targetUrl) {
   const chromeArgs = [
     '--headless=new',
@@ -171,7 +215,7 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
   child.once('error', (error) => { processError = error; });
   child.once('exit', (code, signal) => { processExit = { code, signal }; });
 
-  const deadline = Date.now() + 25_000;
+  const deadline = Date.now() + CHROME_TIMEOUT_MS;
   let previousSize = -1;
   let stableReads = 0;
   try {
@@ -195,12 +239,16 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
       }
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    throw new Error(`Chrome did not finish ${page.route} with its data manifest within 25 seconds`);
+    const screenshotState = stableReads >= 2 ? 'ready' : 'not ready';
+    const manifestState = chromeStdout.includes('render-monitor-manifest') ? 'ready' : 'missing';
+    const stderrDetail = chromeStderr.trim();
+    throw new Error(
+      `Chrome did not finish ${page.route} within ${Math.round(CHROME_TIMEOUT_MS / 1_000)} seconds `
+      + `(screenshot: ${screenshotState}, manifest: ${manifestState})`
+      + (stderrDetail ? `:\n${stderrDetail}` : ''),
+    );
   } finally {
-    if (child.pid && !processExit) {
-      try { process.kill(-child.pid, 'SIGTERM'); } catch { /* browser already stopped */ }
-      await new Promise((resolve) => setTimeout(resolve, 300));
-    }
+    await stopChromeProcessGroup(child);
   }
 }
 
@@ -243,7 +291,7 @@ async function exportPage(chromePath, page, refreshKey) {
     return { name: page.name, route: page.route, outputPath, source: pageManifest.source, fingerprint: pageManifest.fingerprint, width: page.width, height: page.height, status: 'passed' };
   } finally {
     await rm(temporaryPath, { force: true });
-    await rm(profileDir, { recursive: true, force: true });
+    await removeChromeProfile(profileDir);
   }
 }
 
