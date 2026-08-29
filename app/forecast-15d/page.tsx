@@ -67,7 +67,7 @@ export default async function FifteenDayForecast() {
                   <h2 className="forecast15-day text-[11px] font-semibold">{item.day}</h2>
                   <p className="forecast15-date text-[9px] text-[#555]">{item.date}</p>
                 </div>
-                <WeatherIcon color="#555" size={27} weight="light" aria-hidden="true" />
+                <WeatherIcon className="-translate-x-[10px]" color="#555" size={36} weight="light" aria-hidden="true" />
                 <p className="forecast15-temperature text-[11px] whitespace-nowrap"><strong className="font-semibold">{item.high}°</strong><span className="text-[#555]"> / {item.low}°</span></p>
                 <p className="forecast15-rain flex items-center gap-1 text-[10px]"><DropIcon color="#555" size={13} weight="light" aria-hidden="true" /><span>{item.rain}%</span></p>
                 <div className="min-w-0 max-w-full justify-self-end text-right leading-tight">

@@ -246,6 +246,75 @@ button { font: inherit; }
 
 .epaper-landscape .chart-line { height: 2px; }
 
+.epaper-landscape .current-condition-title {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.epaper-landscape .current-metric-label {
+  color: var(--dark);
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.epaper-landscape .current-metric-value {
+  margin-top: 6px;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.epaper-portrait .portrait-day-condition {
+  max-width: 100%;
+  color: var(--black);
+  text-align: center;
+  font-size: 16px;
+  line-height: 1.05;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.epaper-portrait .portrait-night-condition {
+  display: block;
+  max-width: 110px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.05;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.epaper-portrait .portrait-wind-details {
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.epaper-portrait .portrait-detail-label {
+  color: var(--dark);
+  font-size: 12px;
+  line-height: 1.05;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.epaper-portrait .portrait-detail-value {
+  margin-top: 3px;
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 700;
+}
+
 .forecast-selected {
   background-color: var(--white);
   background-image: repeating-linear-gradient(135deg, transparent 0, transparent 6px, var(--light) 6px, var(--light) 7px);

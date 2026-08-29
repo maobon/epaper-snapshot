@@ -49,8 +49,8 @@ function WeatherIcon({ kind, inverted = false }: { kind: WeatherDisplayKind; inv
   );
 }
 
-function makeChartPoints(hourly: LandscapeDashboard['hourly']) {
-  const temperatures = hourly.map((item) => item.temp);
+function makeChartPoints(hourly: LandscapeDashboard['hourly'], scaleHourly = hourly) {
+  const temperatures = scaleHourly.map((item) => item.temp);
   const min = Math.min(...temperatures);
   const max = Math.max(...temperatures);
   const span = Math.max(1, max - min);
@@ -65,10 +65,14 @@ export default async function LandscapeWeather() {
   const dashboard = loaded.data;
   const manifest = createRenderManifest('landscape', loaded.source, dashboard);
   const CurrentIcon = weatherIcons[dashboard.current.kind];
-  const chartPoints = makeChartPoints(dashboard.hourly);
-  const highestTemperature = Math.max(...dashboard.hourly.map((item) => item.temp));
+  const labelIndices = Array.from(
+    { length: 8 },
+    (_, position) => Math.round((position * (dashboard.hourly.length - 1)) / 7),
+  ).filter((index, position, indices) => index >= 0 && indices.indexOf(index) === position);
+  const hourlyPeriods = labelIndices.map((index) => dashboard.hourly[index]);
+  const chartPoints = makeChartPoints(hourlyPeriods, dashboard.hourly);
+  const highestTemperature = Math.max(...hourlyPeriods.map((item) => item.temp));
   const areaPoints = ['0 100%', ...chartPoints.map(({ x, y }) => `${x}px ${y}px`), '746px 100%'].join(', ');
-  const labelIndices = [0, 3, 6, 9, 12, 15, 18, 21].filter((index) => index < dashboard.hourly.length);
 
   return (
     <main className="screen-stage grid min-h-screen min-w-[800px] place-items-center bg-white font-sans text-black">
@@ -78,7 +82,7 @@ export default async function LandscapeWeather() {
           <div className="flex items-center rounded-full border border-[#555] bg-white px-3 py-1 text-sm font-semibold tracking-wide">
             {dashboard.city}
           </div>
-          <div className="flex items-center gap-2 text-xs font-semibold tracking-wide">
+          <div className="flex items-center gap-2 text-base leading-none font-semibold tracking-wide">
             <span className="text-[#555]">{dashboard.dateLabel}</span>
             <span className="rounded-full bg-black px-3 py-1 text-white">{dashboard.current.condition.toUpperCase()}</span>
           </div>
@@ -92,14 +96,13 @@ export default async function LandscapeWeather() {
             <span className="text-[60px] leading-[.85] font-semibold tracking-[-4px]">{dashboard.current.temp}</span>
             <span className="mt-1 ml-2 flex gap-1 text-xl leading-none text-[#555]"><strong className="font-semibold text-black">°C</strong></span>
           </div>
-          <div className="ml-4 max-w-[150px]">
-            <h1 className="text-lg leading-tight font-semibold tracking-tight">{dashboard.current.condition}</h1>
-            <p className="truncate text-sm text-[#555]">Live conditions</p>
+          <div className="ml-4 flex h-[68px] min-w-0 flex-1 flex-col items-center justify-center text-center">
+            <h1 className="current-condition-title">{dashboard.current.condition}</h1>
           </div>
-          <dl className="ml-auto grid h-[68px] w-[342px] grid-cols-3 divide-x divide-[#555] rounded-xl border border-[#555] bg-white">
-            <div className="flex flex-col items-center justify-center"><dt className="text-[10px] font-semibold tracking-wider text-[#555] uppercase">Rain</dt><dd className="mt-1 text-lg leading-none font-semibold">{dashboard.current.rain}%</dd></div>
-            <div className="flex flex-col items-center justify-center"><dt className="text-[10px] font-semibold tracking-wider text-[#555] uppercase">Humidity</dt><dd className="mt-1 text-lg leading-none font-semibold">{dashboard.current.humidity}%</dd></div>
-            <div className="flex flex-col items-center justify-center"><dt className="text-[10px] font-semibold tracking-wider text-[#555] uppercase">Wind</dt><dd className="mt-1 text-lg leading-none font-semibold">{dashboard.current.wind} km/h</dd></div>
+          <dl className="grid h-[68px] w-[342px] shrink-0 grid-cols-3 divide-x divide-[#555] rounded-xl border border-[#555] bg-white">
+            <div className="flex flex-col items-center justify-center"><dt className="current-metric-label">Rain</dt><dd className="current-metric-value">{dashboard.current.rain}%</dd></div>
+            <div className="flex flex-col items-center justify-center"><dt className="current-metric-label">Humidity</dt><dd className="current-metric-value">{dashboard.current.humidity}%</dd></div>
+            <div className="flex flex-col items-center justify-center"><dt className="current-metric-label">Wind</dt><dd className="current-metric-value">{dashboard.current.wind} km/h</dd></div>
           </dl>
         </section>
 
@@ -115,16 +118,17 @@ export default async function LandscapeWeather() {
               const dy = next.y - point.y;
               return <i className="chart-line" key={`${point.x}-${point.y}`} style={{ left: point.x, top: point.y, width: Math.sqrt(dx * dx + dy * dy), transform: `rotate(${Math.atan2(dy, dx) * (180 / Math.PI)}deg)` }} />;
             })}
-            {labelIndices.map((index) => {
-              const point = chartPoints[index];
-              const isHighest = dashboard.hourly[index].temp === highestTemperature;
-              return <b className={`absolute z-[3] rounded-sm bg-white px-1 py-0.5 text-[11px] font-semibold ${index === 0 ? 'text-black' : 'text-[#555]'}`} key={index} style={{ left: point.x, top: Math.max(isHighest ? -6 : 0, point.y - (isHighest ? 30 : 24)), transform: index === 0 ? undefined : 'translateX(-50%)' }}>{dashboard.hourly[index].temp}°</b>;
+            {hourlyPeriods.map((item, position) => {
+              const point = chartPoints[position];
+              const isHighest = item.temp === highestTemperature;
+              const transform = position === 0 ? undefined : position === hourlyPeriods.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)';
+              return <b className="absolute z-[3] rounded-sm bg-white px-1 py-0.5 text-[11px] font-semibold text-black" key={`${item.time}-${position}`} style={{ left: point.x, top: Math.max(isHighest ? -6 : 0, point.y - (isHighest ? 30 : 24)), transform }}>{item.temp}°</b>;
             })}
           </div>
           <div className="relative h-6 w-[746px] text-xs font-medium text-[#555]">
-            {labelIndices.map((index) => (
-              <span className="absolute top-1.5 whitespace-nowrap" key={index} style={{ left: chartPoints[index].x, transform: index === 0 ? undefined : 'translateX(-50%)' }}>
-                {dashboard.hourly[index].time}
+            {hourlyPeriods.map((item, position) => (
+              <span className="absolute top-1.5 whitespace-nowrap" key={`${item.time}-${position}`} style={{ left: chartPoints[position].x, transform: position === 0 ? undefined : position === hourlyPeriods.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)' }}>
+                {item.time}
               </span>
             ))}
           </div>

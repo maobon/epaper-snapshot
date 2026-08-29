@@ -197,23 +197,25 @@ async function landscapeSvg() {
   const data = loaded.data;
   let body = '<defs><pattern id="forecast-selected-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#aaaaaa" stroke-width="1"/></pattern></defs>' + rect(1, 1, 798, 478, 0, BLACK, WHITE, 2);
   body += rect(15, 15, 84, 31, 16, DARK, WHITE, 2) + text(27, 36, data.city, 14, 700);
-  body += text(698, 35, data.dateLabel, 12, 700, { anchor: 'end', fill: DARK });
-  body += rect(706, 19, 79, 23, 12, BLACK, BLACK, 0) + text(745, 35, data.current.condition.toUpperCase(), 12, 700, { anchor: 'middle', fill: WHITE });
+  body += text(659, 36, data.dateLabel, 16, 700, { anchor: 'end', fill: DARK });
+  body += rect(667, 16, 118, 29, 15, BLACK, BLACK, 0) + text(726, 36, data.current.condition.toUpperCase(), 16, 700, { anchor: 'middle', fill: WHITE });
   body += rect(15, 55, 770, 99, 16, DARK, WHITE, 2);
   body += weatherIcon(data.current.kind, 31, 72, 64, BLACK);
   body += text(114, 127, data.current.temp, 60, 700) + text(187, 100, '°C', 22, 700);
-  body += text(227, 101, data.current.condition, 18, 700) + text(227, 123, 'Live conditions', 14, 700, { fill: DARK });
+  body += text(327, 112, data.current.condition, 24, 700, { anchor: 'middle' });
   const metrics = [['RAIN', `${data.current.rain}%`], ['HUMIDITY', `${data.current.humidity}%`], ['WIND', `${data.current.wind} km/h`]];
   metrics.forEach(([label, value], index) => {
     const x = 427 + index * 113;
     body += rect(x, 71, 114, 66, index === 0 ? 12 : index === 2 ? 12 : 0, DARK, WHITE, 1);
-    body += text(x + 57, 97, label, 10, 700, { anchor: 'middle', fill: DARK, spacing: 1 }) + text(x + 57, 119, value, 18, 700, { anchor: 'middle' });
+    body += text(x + 57, 96, label, 14, 700, { anchor: 'middle', fill: DARK, spacing: 0.8 }) + text(x + 57, 126, value, 24, 700, { anchor: 'middle' });
   });
   body += rect(15, 163, 770, 153, 16, DARK, WHITE, 2) + text(29, 188, 'Next 24 hours', 14, 700);
   const temperatures = data.hourly.map((hour) => hour.temp), min = Math.min(...temperatures), max = Math.max(...temperatures), span = Math.max(1, max - min);
-  const hourlyPoints = data.hourly.map((hour, index) => ({ x: 28 + index * 746 / Math.max(1, data.hourly.length - 1), y: 270 - (hour.temp - min) / span * 56 }));
+  const hourlyLabelIndices = Array.from({ length: 8 }, (_, position) => Math.round(position * (data.hourly.length - 1) / 7));
+  const hourlyPeriods = hourlyLabelIndices.map((index) => data.hourly[index]);
+  const hourlyPoints = hourlyPeriods.map((hour, position) => ({ x: 28 + position * 746 / Math.max(1, hourlyPeriods.length - 1), y: 270 - (hour.temp - min) / span * 56 }));
   body += line(28, 278, 774, 278, LIGHT, 1) + `<path d="${hourlyPoints.map((p, i) => `${i ? 'L' : 'M'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="${BLACK}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
-  [0, 3, 6, 9, 12, 15, 18, 21].forEach((index) => { const point = hourlyPoints[index], isHighest = data.hourly[index].temp === max; body += text(point.x, Math.max(isHighest ? 199 : 205, point.y - (isHighest ? 14 : 8)), `${data.hourly[index].temp}°`, 11, 700, { anchor: index === 0 ? 'start' : 'middle', fill: DARK }); body += text(point.x, 297, data.hourly[index].time, 11, 700, { anchor: index === 0 ? 'start' : 'middle', fill: DARK }); });
+  hourlyPeriods.forEach((hour, position) => { const point = hourlyPoints[position], isHighest = hour.temp === max, anchor = position === 0 ? 'start' : position === hourlyPeriods.length - 1 ? 'end' : 'middle'; body += text(point.x, Math.max(isHighest ? 199 : 205, point.y - (isHighest ? 14 : 8)), `${hour.temp}°`, 11, 700, { anchor, fill: BLACK }); body += text(point.x, 297, hour.time, 11, 700, { anchor, fill: DARK }); });
   data.forecast.forEach((day, index) => {
     const x = 15 + index * 97;
     const selected = index === 0;
@@ -235,13 +237,13 @@ async function portraitSvg() {
   const data = loaded.data;
   let body = rect(1, 1, 478, 798, 0, BLACK, WHITE, 2);
   body += rect(10, 10, 460, 184, 14, DARK, WHITE, 2) + text(20, 34, 'CURRENT', 14, 700) + text(460, 34, `${data.city.toUpperCase()} · ${data.dateLabel}`, 11, 700, { anchor: 'end', fill: DARK });
-  body += text(20, 106, data.day.temp, 68, 700) + text(91, 65, '°', 26, 700) + weatherIcon(data.day.kind, 201, 47, 48, DARK) + text(225, 111, data.day.condition.toUpperCase(), 12, 700, { anchor: 'middle' });
-  body += text(358, 70, `Wind ${data.day.wind} ${data.windUnit}`, 15, 700) + text(358, 94, `Gust · Level ${data.day.gustLevel}`, 15, 700);
+  body += text(20, 106, data.day.temp, 68, 700) + text(91, 65, '°', 26, 700) + weatherIcon(data.day.kind, 201, 47, 48, DARK) + text(225, 111, data.day.condition.toUpperCase(), 16, 700, { anchor: 'middle' });
+  body += text(350, 70, `Wind ${data.day.wind} ${data.windUnit}`, 17, 700) + text(350, 94, `Gust · Level ${data.day.gustLevel}`, 17, 700);
   body += line(20, 122, 460, 122, LIGHT, 1);
   const detail = [['FEELS LIKE', `${data.day.feels}°`], ['VISIBILITY', `${data.day.visibility} ${data.distanceUnit}`], ['UV INDEX', data.day.uv], ['CLOUD', `${data.day.cloud}%`]];
-  detail.forEach(([label, value], index) => { const x = 20 + index * 110; if (index) body += line(x, 130, x, 184, LIGHT, 1); body += text(x + 10, 153, label, 9, 700, { fill: DARK, spacing: 0.5 }) + text(x + 10, 177, value, 14, 700); });
+  detail.forEach(([label, value], index) => { const x = 20 + index * 110; if (index) body += line(x, 130, x, 184, LIGHT, 1); body += text(x + 55, 153, label, 12, 700, { anchor: 'middle', fill: DARK, spacing: 0.3 }) + text(x + 55, 177, value, 17, 700, { anchor: 'middle' }); });
   body += rect(10, 201, 460, 96, 14, DARK, WHITE, 2) + sectionTitle(225, 'NIGHT', '18:00 — 06:00');
-  body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 170, 235, 38, DARK) + text(216, 265, data.night.condition.toUpperCase(), 10, 700) + text(358, 253, `Wind ${data.night.wind} ${data.windUnit}`, 15, 700) + text(358, 277, `Gust · Level ${data.night.gustLevel}`, 15, 700);
+  body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 170, 235, 38, DARK) + text(216, 265, data.night.condition.toUpperCase(), 15, 700) + text(350, 253, `Wind ${data.night.wind} ${data.windUnit}`, 17, 700) + text(350, 277, `Gust · Level ${data.night.gustLevel}`, 17, 700);
   body += rect(10, 304, 460, 123, 14, DARK, WHITE, 2) + sectionTitle(328, 'HOURLY AQI FORECAST', 'LIVE') + line(20, 410, 460, 410, LIGHT, 1);
   const aqi = data.hourly;
   aqi.forEach((item, index) => { const x = 40 + index * 33; const height = Math.max(14, Math.min(45, item.value * 0.45)); body += `<rect x="${x - 4}" y="${402 - height}" width="8" height="${height}" rx="3" fill="${index === 0 ? DARK : LIGHT}"/>` + text(x, 420, item.time, 9, 700, { anchor: 'middle', fill: DARK }); });
@@ -268,7 +270,7 @@ async function forecast15Svg() {
   items.forEach((item, index) => {
     const y = 65 + index * (728 / 15);
     body += text(20, y + 18, item.day, 16, 700) + text(20, y + 35, item.date, 13, 700, { fill: DARK });
-    body += weatherIcon(item.kind, 104, y + 7, 30, DARK);
+    body += weatherIcon(item.kind, 94, y + 4, 36, DARK);
     body += text(166, y + 24, `${item.high}°`, 16, 700) + text(203, y + 24, `/ ${item.low}°`, 15, 700, { fill: DARK });
     body += text(264, y + 24, `${item.rain}%`, 16, 700);
     body += text(460, y + 19, `${item.windDirection} · ${item.windSpeed} ${loaded.data.windSpeedUnit}`, 16, 700, { anchor: 'end' }) + text(460, y + 36, item.condition, 14, 700, { anchor: 'end', fill: DARK });
