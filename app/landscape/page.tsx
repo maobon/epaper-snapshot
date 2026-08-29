@@ -82,10 +82,7 @@ export default async function LandscapeWeather() {
           <div className="flex items-center rounded-full border border-[#555] bg-white px-3 py-1 text-sm font-semibold tracking-wide">
             {dashboard.city}
           </div>
-          <div className="flex items-center gap-2 text-base leading-none font-semibold tracking-wide">
-            <span className="text-[#555]">{dashboard.dateLabel}</span>
-            <span className="rounded-full bg-black px-3 py-1 text-white">{dashboard.current.condition.toUpperCase()}</span>
-          </div>
+          <span className="text-xl leading-none font-semibold tracking-wide text-[#555]">{dashboard.dateLabel}</span>
         </header>
 
         <section className="mt-2 flex h-[100px] items-center rounded-2xl border border-[#555] bg-white px-4" aria-label="Current weather">
