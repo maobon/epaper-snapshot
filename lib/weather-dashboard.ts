@@ -1,7 +1,7 @@
 import { fetchDailyWeather, fetchDaysWeather, fetchHourlyWeather } from '@/lib/weather-api';
 import { getWeatherPresentation, type WeatherDisplayKind, type WeatherKind } from '@/lib/weather-presentation';
 
-const DISPLAY_CITY = 'BEIJING';
+const DISPLAY_CITY = 'Beijing';
 
 export type MonitoredData<T> = {
   data: T;

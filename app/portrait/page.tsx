@@ -44,7 +44,7 @@ export default async function PortraitWeather() {
       <script id="render-monitor-manifest" type="application/json" dangerouslySetInnerHTML={{ __html: serializeRenderManifest(manifest) }} />
       <section className="epaper-portrait flex h-[800px] w-[480px] flex-col gap-1.5 overflow-hidden rounded-none border-2 border-black bg-white p-2" aria-label={`Portrait ${dashboard.city} weather dashboard`}>
         <section className="h-[184px] shrink-0 overflow-hidden rounded-2xl border border-[#555] bg-white p-2" aria-label="Current weather">
-          <header className="flex h-5 items-center justify-between text-xs font-semibold"><h1 className="tracking-wide">CURRENT</h1><p className="text-[10px] text-[#555]">{dashboard.city.toUpperCase()} · {dashboard.dateLabel}</p></header>
+          <header className="flex h-5 items-center justify-between text-xs font-semibold"><h1 className="tracking-wide">CURRENT</h1><p className="text-[10px] text-[#555]">{dashboard.city} · {dashboard.dateLabel}</p></header>
           <div className="grid h-[82px] grid-cols-[120px_minmax(0,1fr)_150px] items-center gap-2">
             <div className="flex items-start"><strong className="text-[70px] leading-[.86] tracking-[-4px]">{dashboard.day.temp}</strong><span className="ml-1 text-[28px] leading-none">°</span></div>
             <div className="flex flex-col items-center justify-self-center"><DayIcon color="#555" size={43} weight="light" /><span className="portrait-day-condition mt-0.5">{dashboard.day.condition}</span></div>
