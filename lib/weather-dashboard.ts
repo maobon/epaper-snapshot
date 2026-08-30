@@ -201,7 +201,7 @@ export async function loadForecast15Dashboard(): Promise<MonitoredData<Forecast1
   const fallback = { city: DISPLAY_CITY, forecast: fallback15, range: forecast15Range(fallback15), windSpeedUnit: 'km/h' };
   try {
     const source = await fetchDaysWeather<Source>();
-    const future = (source.days?.dailyWeathers ?? []).filter((item) => item.publicDate > (source.currentTime ?? '')).slice(0, 15);
+    const future = (source.days?.dailyWeathers ?? []).filter((item) => item.publicDate >= (source.currentTime ?? '')).slice(0, 15);
     if (future.length !== 15) throw new Error('Weather source returned fewer than 15 future days');
     const forecast = future.map((item) => {
       const presentation = getWeatherPresentation(item.dayWeaName, item.dayWeaIcon);

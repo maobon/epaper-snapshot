@@ -78,7 +78,7 @@ export default async function LandscapeWeather() {
     <main className="screen-stage grid min-h-screen min-w-[800px] place-items-center bg-white font-sans text-black">
       <script id="render-monitor-manifest" type="application/json" dangerouslySetInnerHTML={{ __html: serializeRenderManifest(manifest) }} />
       <section className="epaper-landscape h-[480px] w-[800px] overflow-hidden rounded-none border-2 border-black bg-white p-3" aria-label={`${dashboard.city} weather dashboard`}>
-        <header className="flex h-8 items-center justify-between">
+        <header className="flex h-8 items-center justify-between px-5">
           <div className="landscape-city">
             {dashboard.city}
           </div>

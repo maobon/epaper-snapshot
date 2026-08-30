@@ -7,7 +7,6 @@ import { CloudMoonIcon } from '@phosphor-icons/react/dist/ssr/CloudMoon';
 import { CloudSunIcon } from '@phosphor-icons/react/dist/ssr/CloudSun';
 import { MoonStarsIcon } from '@phosphor-icons/react/dist/ssr/MoonStars';
 import { SunIcon } from '@phosphor-icons/react/dist/ssr/Sun';
-import { WindIcon } from '@phosphor-icons/react/dist/ssr/Wind';
 import { createRenderManifest, serializeRenderManifest } from '@/lib/render-monitor';
 import { fallbackPortrait, loadPortraitDashboard } from '@/lib/weather-dashboard';
 
@@ -48,7 +47,7 @@ export default async function PortraitWeather() {
           <div className="grid h-[82px] grid-cols-[120px_minmax(0,1fr)_150px] items-center gap-2">
             <div className="flex items-start"><strong className="text-[70px] leading-[.86] tracking-[-4px]">{dashboard.day.temp}</strong><span className="ml-1 text-[28px] leading-none">°</span></div>
             <div className="flex flex-col items-center justify-self-center"><DayIcon color="#555" size={43} weight="light" /><span className="portrait-day-condition mt-0.5">{dashboard.day.condition}</span></div>
-            <dl className="portrait-wind-details w-[126px] justify-self-end space-y-2"><div className="flex items-center gap-1.5 whitespace-nowrap"><WindIcon size={16} weight="light" /><dt className="sr-only">Wind</dt><dd><b>Wind</b> {dashboard.day.wind} {dashboard.windUnit}</dd></div><div className="flex items-center gap-1.5 whitespace-nowrap"><WindIcon className="rotate-180" size={16} weight="light" /><dt className="sr-only">Wind gust level</dt><dd><b>Gust</b> · Level {dashboard.day.gustLevel}</dd></div></dl>
+            <dl className="portrait-wind-details w-[126px] justify-self-end space-y-2"><div className="whitespace-nowrap"><dt className="sr-only">Wind</dt><dd><b>Wind</b> {dashboard.day.wind} {dashboard.windUnit}</dd></div><div className="whitespace-nowrap"><dt className="sr-only">Wind gust level</dt><dd><b>Gust</b> · Level {dashboard.day.gustLevel}</dd></div></dl>
           </div>
           <dl className="grid h-[64px] grid-cols-4 divide-x divide-[#aaa] border-t border-[#aaa] pt-1.5">
             <div className="portrait-detail-item"><dt className="portrait-detail-label">Feels like</dt><dd className="portrait-detail-value">{dashboard.day.feels}°</dd></div>
@@ -59,7 +58,7 @@ export default async function PortraitWeather() {
         </section>
         <section className="h-[96px] shrink-0 rounded-2xl border border-[#555] bg-white p-2" aria-label="Night weather">
           <header className="flex h-5 items-center justify-between text-xs font-semibold"><h2 className="tracking-wide">NIGHT</h2><p className="text-[#555]">18:00 — 06:00</p></header>
-          <div className="grid h-[58px] grid-cols-[120px_minmax(0,1fr)_150px] items-center gap-2"><div className="flex items-start"><strong className="text-[56px] leading-none tracking-[-3px]">{dashboard.night.temp}</strong><span className="text-2xl leading-none">°</span></div><div className="flex items-center justify-self-center gap-2"><NightIcon color="#555" size={35} weight="light" /><span className="portrait-night-condition">{dashboard.night.condition}</span></div><dl className="portrait-wind-details w-[126px] justify-self-end space-y-1.5"><div className="flex items-center gap-1.5 whitespace-nowrap"><WindIcon size={16} weight="light" /><dt className="sr-only">Wind</dt><dd><b>Wind</b> {dashboard.night.wind} {dashboard.windUnit}</dd></div><div className="flex items-center gap-1.5 whitespace-nowrap"><WindIcon className="rotate-180" size={16} weight="light" /><dt className="sr-only">Wind gust level</dt><dd><b>Gust</b> · Level {dashboard.night.gustLevel}</dd></div></dl></div>
+          <div className="grid h-[58px] grid-cols-[120px_minmax(0,1fr)_150px] items-center gap-2"><div className="flex items-start"><strong className="text-[56px] leading-none tracking-[-3px]">{dashboard.night.temp}</strong><span className="text-2xl leading-none">°</span></div><div className="relative flex w-full items-center justify-center"><NightIcon className="absolute left-0" color="#555" size={35} weight="light" /><span className="portrait-night-condition">{dashboard.night.condition}</span></div><dl className="portrait-wind-details w-[126px] justify-self-end space-y-1.5"><div className="whitespace-nowrap"><dt className="sr-only">Wind</dt><dd><b>Wind</b> {dashboard.night.wind} {dashboard.windUnit}</dd></div><div className="whitespace-nowrap"><dt className="sr-only">Wind gust level</dt><dd><b>Gust</b> · Level {dashboard.night.gustLevel}</dd></div></dl></div>
         </section>
         <section className="h-[124px] shrink-0 rounded-2xl border border-[#555] bg-white p-2" aria-label="Hourly air quality forecast">
           <header className="flex h-5 items-center justify-between"><h2 className="text-sm font-semibold">HOURLY AQI FORECAST</h2><span className="text-xs text-[#555]">LIVE</span></header>
@@ -67,9 +66,9 @@ export default async function PortraitWeather() {
         </section>
         <section className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#555] bg-white p-2" aria-label="Seven day weather forecast">
           <header className="flex h-5 items-center justify-between"><h2 className="text-sm font-semibold">7-DAY FORECAST</h2><span className="text-xs text-[#555]">LIVE</span></header>
-          <div className="mt-1 grid h-[128px] grid-cols-7">{dashboard.forecast.map((item) => { const Icon = weatherIcons[item.kind]; return <article className="flex min-w-0 flex-col items-center justify-between pb-3 text-center" key={item.date}><p className="text-[9px] text-[#555]">{item.date}</p><h3 className="text-[10px] font-semibold">{item.day}</h3><Icon color="#555" size={32} weight="light" aria-hidden="true" /><p className="portrait-forecast-condition w-full px-0.5 text-[9px]"><span>{item.condition}</span></p></article>; })}</div>
+          <div className="mt-1 grid h-[128px] grid-cols-7">{dashboard.forecast.map((item) => { const Icon = weatherIcons[item.kind]; return <article className="flex min-w-0 flex-col items-center justify-between pb-3 text-center" key={item.date}><p className="text-[9px] text-[#555]">{item.date}</p><h3 className="portrait-forecast-day">{item.day}</h3><Icon color="#555" size={32} weight="light" aria-hidden="true" /><p className="portrait-forecast-condition w-full px-0.5"><span>{item.condition}</span></p></article>; })}</div>
           <div className="relative h-[130px]"><TemperatureLine color="#aaa" points={highPoints} /><TemperatureLine color="#aaa" points={lowPoints} />{dashboard.forecast.map((item, index) => <div className="absolute top-0 flex h-[130px] w-[52px] -translate-x-1/2 flex-col justify-between text-center text-[10px] font-semibold" key={`temperature-${item.date}`} style={{ left: highPoints[index].x }}><span className="text-[16px] leading-none">{item.high}°</span><span className="relative top-[18px] text-[16px] leading-none text-[#555]">{item.low}°</span></div>)}</div>
-          <div className="grid h-[55px] grid-cols-7">{dashboard.forecast.map((item) => <div className="flex translate-y-2 flex-col items-center justify-center text-[9px]" key={`wind-${item.date}`}><span>{item.wind}</span><span>{item.level} Level</span></div>)}</div>
+          <div className="grid h-[55px] grid-cols-7">{dashboard.forecast.map((item) => <div className="portrait-forecast-wind flex translate-y-[15px] flex-col items-center justify-center" key={`wind-${item.date}`}><span>{item.wind}</span><span>{item.level} Level</span></div>)}</div>
         </section>
       </section>
     </main>

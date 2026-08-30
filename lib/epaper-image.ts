@@ -197,8 +197,8 @@ async function landscapeSvg() {
   const loaded = await loadLandscapeDashboard();
   const data = loaded.data;
   let body = '<defs><pattern id="forecast-selected-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#aaaaaa" stroke-width="1"/></pattern></defs>' + rect(1, 1, 798, 478, 0, BLACK, WHITE, 2);
-  body += text(15, 39, data.city, 20, 700, { spacing: 0.2 });
-  body += text(785, 38, data.dateLabel, 20, 700, { anchor: 'end', fill: DARK });
+  body += text(35, 39, data.city, 20, 700, { spacing: 0.2 });
+  body += text(765, 38, data.dateLabel, 20, 700, { anchor: 'end', fill: DARK });
   body += rect(15, 55, 770, 99, 16, DARK, WHITE, 2);
   body += weatherIcon(data.current.kind, 31, 72, 64, BLACK);
   body += text(114, 127, data.current.temp, 60, 700) + text(187, 100, '°C', 22, 700);
@@ -252,9 +252,9 @@ async function portraitSvg() {
   data.forecast.forEach((day, index) => {
     const x = forecastX(index);
     const conditionLines = wrapTextLines(day.condition, 11);
-    body += text(x, 499, day.date, 9, 700, { anchor: 'middle', fill: DARK }) + text(x, 522, day.day, 10, 700, { anchor: 'middle' }) + weatherIcon(day.kind, x - 16, 529, 32, DARK);
-    body += conditionLines.map((condition, lineIndex) => text(x, conditionLines.length === 1 ? 600 : 594 + lineIndex * 12, condition, 9, 700, { anchor: 'middle' })).join('');
-    body += text(x, 651, `${day.high}°`, 16, 700, { anchor: 'middle' }) + text(x, 735, `${day.low}°`, 16, 700, { anchor: 'middle', fill: DARK }) + text(x, 770, `${day.wind} · ${day.level}`, 9, 700, { anchor: 'middle' });
+    body += text(x, 499, day.date, 9, 700, { anchor: 'middle', fill: DARK }) + text(x, 522, day.day, 11, 700, { anchor: 'middle' }) + weatherIcon(day.kind, x - 16, 529, 32, DARK);
+    body += conditionLines.map((condition, lineIndex) => text(x, conditionLines.length === 1 ? 600 : 594 + lineIndex * 12, condition, 11, 700, { anchor: 'middle' })).join('');
+    body += text(x, 651, `${day.high}°`, 16, 700, { anchor: 'middle' }) + text(x, 735, `${day.low}°`, 16, 700, { anchor: 'middle', fill: DARK }) + text(x, 785, `${day.wind} · ${day.level}`, 11, 700, { anchor: 'middle' });
   });
   const high = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${679 - (day.high - Math.min(...data.forecast.map((item) => item.high))) * 4.5}`).join(' ');
   const low = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${737 - (day.low - Math.min(...data.forecast.map((item) => item.low))) * 4.5}`).join(' ');
