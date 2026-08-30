@@ -305,7 +305,7 @@ button { font: inherit; }
   max-width: 100%;
   color: var(--black);
   text-align: center;
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1.05;
   font-weight: 700;
   overflow-wrap: anywhere;
@@ -316,7 +316,7 @@ button { font: inherit; }
   display: block;
   max-width: 110px;
   text-align: center;
-  font-size: 15px;
+  font-size: 18px;
   line-height: 1.05;
   font-weight: 700;
   overflow-wrap: anywhere;

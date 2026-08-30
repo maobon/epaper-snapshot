@@ -1,6 +1,8 @@
 import { fetchDailyWeather, fetchDaysWeather, fetchHourlyWeather } from '@/lib/weather-api';
 import { getWeatherPresentation, type WeatherDisplayKind, type WeatherKind } from '@/lib/weather-presentation';
 
+const DISPLAY_CITY = 'BEIJING';
+
 export type MonitoredData<T> = {
   data: T;
   source: 'live' | 'fallback';
@@ -20,7 +22,7 @@ export type LandscapeDashboard = {
 };
 
 const fallbackLandscape: LandscapeDashboard = {
-  city: 'Beijing',
+  city: DISPLAY_CITY,
   dateLabel: 'TUE · 22:25',
   current: { temp: 22, kind: 'partly-small', condition: 'Partly cloudy', rain: 9, humidity: 92, wind: 10 },
   hourly: [22, 25, 25, 25, 24, 24, 22, 22, 23, 24, 24, 25, 26, 26, 27, 27, 27, 27, 26, 25, 25, 25, 24, 24].map(
@@ -71,7 +73,7 @@ export async function loadLandscapeDashboard(): Promise<MonitoredData<LandscapeD
     }));
     if (hourly.length !== 24 || forecast.length !== 8) throw new Error('Hourly weather source returned an incomplete forecast');
     return { source: 'live', data: {
-      city: source.cityInfo?.localizedName ?? source.cityInfo?.englishName ?? source.cityInfo?.name ?? fallbackLandscape.city,
+      city: DISPLAY_CITY,
       dateLabel: formatCurrentTime(source.currentTime),
       current: {
         temp: source.actual.temperature ?? fallbackLandscape.current.temp,
@@ -109,7 +111,7 @@ const fallbackPortraitForecast: PortraitForecastDay[] = [
 ].map(([date, day, condition, high, low, wind, level, kind]) => ({ date: String(date), day: String(day), condition: String(condition), high: Number(high), low: Number(low), wind: String(wind), level: Number(level), kind: kind as WeatherKind }));
 
 export const fallbackPortrait: PortraitDashboard = {
-  city: 'Chaoyang District', dateLabel: '08/25 TUE', distanceUnit: 'km', windUnit: 'km/h',
+  city: DISPLAY_CITY, dateLabel: '08/25 TUE', distanceUnit: 'km', windUnit: 'km/h',
   day: { temp: 30, kind: 'rain', condition: 'Moderate rain', wind: 10, gustLevel: 3, feels: 34, visibility: 6, uv: 'Moderate', cloud: 95 },
   night: { temp: 21, kind: 'storm', condition: 'Thunderstorms', wind: 10, gustLevel: 3 },
   hourly: [33, 30, 31, 37, 34, 36, 40, 35, 42, 60, 59, 55, 68].map((value, index) => ({ time: String(index).padStart(2, '0'), value, level: value <= 50 ? 1 : 2 })),
@@ -160,7 +162,7 @@ export async function loadPortraitDashboard(): Promise<MonitoredData<PortraitDas
     const hourly = (hourlySource.hourly ?? []).slice(0, 13).map((item, index) => { const value = item.aqi ?? 0; return { time: item.time?.slice(11, 13) ?? String(index).padStart(2, '0'), value, level: value <= 50 ? 1 : value <= 100 ? 2 : 3 }; });
     if (hourly.length !== 13) throw new Error('Weather source returned an incomplete AQI forecast');
     return { source: 'live', data: {
-      city: source.cityInfo?.localizedName ?? source.cityInfo?.englishName ?? source.cityInfo?.name ?? fallbackPortrait.city,
+      city: DISPLAY_CITY,
       dateLabel: `${currentDate.mmdd} ${currentDate.weekday.toUpperCase()}`,
       day: { temp: hourlySource.actual.temperature ?? fallbackPortrait.day.temp, kind: dayWeather.kind, condition: dayWeather.label, wind: hourlySource.actual.windspeed ?? fallbackPortrait.day.wind, gustLevel: hourlySource.actual.windgustlevel ?? fallbackPortrait.day.gustLevel, feels: hourlySource.actual.realfeel ?? fallbackPortrait.day.feels, visibility: hourlySource.actual.visibility ?? fallbackPortrait.day.visibility, uv: uvLabel(hourlySource.actual.uvindex), cloud: hourlySource.actual.cloudCover ?? fallbackPortrait.day.cloud },
       night: { temp: current.mintemp ?? fallbackPortrait.night.temp, kind: nightWeather.kind, condition: nightWeather.label, wind: current.conditionNight?.windspeed ?? fallbackPortrait.night.wind, gustLevel: current.conditionNight?.windGustPow ?? fallbackPortrait.night.gustLevel },
@@ -196,7 +198,7 @@ function forecast15Range(items: Forecast15Item[]) {
 export async function loadForecast15Dashboard(): Promise<MonitoredData<Forecast15Dashboard>> {
   type Day = { publicDate: string; showDay?: string; maxtemp?: number; mintemp?: number; dayWeaName?: string; dayWeaIcon?: string; conditionDay?: { precProb?: number; rainProb?: number; winddir?: string; windspeed?: number } };
   type Source = { currentTime?: string; windSpeedUnit?: string; cityInfo?: { localizedName?: string; englishName?: string }; days?: { dailyWeathers?: Day[] } };
-  const fallback = { city: 'Chaoyang District', forecast: fallback15, range: forecast15Range(fallback15), windSpeedUnit: 'km/h' };
+  const fallback = { city: DISPLAY_CITY, forecast: fallback15, range: forecast15Range(fallback15), windSpeedUnit: 'km/h' };
   try {
     const source = await fetchDaysWeather<Source>();
     const future = (source.days?.dailyWeathers ?? []).filter((item) => item.publicDate > (source.currentTime ?? '')).slice(0, 15);
@@ -206,7 +208,7 @@ export async function loadForecast15Dashboard(): Promise<MonitoredData<Forecast1
       const condition = item.conditionDay ?? {};
       return { day: new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(new Date(`${item.publicDate}T00:00:00Z`)), date: item.showDay || item.publicDate.slice(5).replace('-', '/'), condition: presentation.label, kind: presentation.kind, high: Math.round(Number(item.maxtemp ?? 0)), low: Math.round(Number(item.mintemp ?? 0)), rain: Math.round(Number(condition.precProb ?? condition.rainProb ?? 0)), windDirection: condition.winddir || '—', windSpeed: Math.round(Number(condition.windspeed ?? 0)) };
     });
-    const data = { city: source.cityInfo?.localizedName ?? source.cityInfo?.englishName ?? fallback.city, forecast, range: forecast15Range(forecast), windSpeedUnit: source.windSpeedUnit ?? fallback.windSpeedUnit };
+    const data = { city: DISPLAY_CITY, forecast, range: forecast15Range(forecast), windSpeedUnit: source.windSpeedUnit ?? fallback.windSpeedUnit };
     return { source: 'live', data };
   } catch (error) {
     console.error('Unable to load 15-day weather data:', error);

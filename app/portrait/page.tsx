@@ -14,10 +14,10 @@ import { fallbackPortrait, loadPortraitDashboard } from '@/lib/weather-dashboard
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Chaoyang District Weather · Portrait',
+  title: 'Beijing Weather · Portrait',
   description: 'A live 480 by 800 pixel four-level grayscale weather dashboard for portrait e-paper displays.',
-  openGraph: { title: 'Chaoyang District Weather · Portrait', description: 'Live portrait weather dashboard for e-paper.', images: [] },
-  twitter: { card: 'summary', title: 'Chaoyang District Weather · Portrait', description: 'Live portrait weather dashboard for e-paper.', images: [] },
+  openGraph: { title: 'Beijing Weather · Portrait', description: 'Live portrait weather dashboard for e-paper.', images: [] },
+  twitter: { card: 'summary', title: 'Beijing Weather · Portrait', description: 'Live portrait weather dashboard for e-paper.', images: [] },
 };
 
 const weatherIcons = { rain: CloudRainIcon, storm: CloudLightningIcon, snow: CloudSnowIcon, partly: CloudSunIcon, cloudy: CloudIcon, sunny: SunIcon, 'night-clear': MoonStarsIcon, 'partly-small': CloudMoonIcon };

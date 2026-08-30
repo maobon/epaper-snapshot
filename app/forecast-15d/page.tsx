@@ -10,16 +10,16 @@ import { createRenderManifest, serializeRenderManifest } from '@/lib/render-moni
 import { loadForecast15Dashboard } from '@/lib/weather-dashboard';
 
 export const metadata: Metadata = {
-  title: 'Chaoyang District · 15-Day Forecast',
+  title: 'Beijing · 15-Day Forecast',
   description: 'A live 480 by 800 pixel, four-level grayscale 15-day weather forecast for portrait e-paper displays.',
   openGraph: {
-    title: 'Chaoyang District · 15-Day Forecast',
+    title: 'Beijing · 15-Day Forecast',
     description: 'Live 15-day weather data in a 480 × 800 four-level grayscale e-paper layout.',
     images: [],
   },
   twitter: {
     card: 'summary',
-    title: 'Chaoyang District · 15-Day Forecast',
+    title: 'Beijing · 15-Day Forecast',
     description: 'Live 15-day weather data in a 480 × 800 four-level grayscale e-paper layout.',
     images: [],
   },
