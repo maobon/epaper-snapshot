@@ -79,7 +79,7 @@ export default async function LandscapeWeather() {
       <script id="render-monitor-manifest" type="application/json" dangerouslySetInnerHTML={{ __html: serializeRenderManifest(manifest) }} />
       <section className="epaper-landscape h-[480px] w-[800px] overflow-hidden rounded-none border-2 border-black bg-white p-3" aria-label={`${dashboard.city} weather dashboard`}>
         <header className="flex h-8 items-center justify-between">
-          <div className="flex items-center rounded-full border border-[#555] bg-white px-3 py-1 text-sm font-semibold tracking-wide">
+          <div className="landscape-city">
             {dashboard.city}
           </div>
           <span className="text-xl leading-none font-semibold tracking-wide text-[#555]">{dashboard.dateLabel}</span>
@@ -93,7 +93,7 @@ export default async function LandscapeWeather() {
             <span className="text-[60px] leading-[.85] font-semibold tracking-[-4px]">{dashboard.current.temp}</span>
             <span className="mt-1 ml-2 flex gap-1 text-xl leading-none text-[#555]"><strong className="font-semibold text-black">°C</strong></span>
           </div>
-          <div className="ml-4 flex h-[68px] min-w-0 flex-1 flex-col items-center justify-center text-center">
+          <div className="current-condition">
             <h1 className="current-condition-title">{dashboard.current.condition}</h1>
           </div>
           <dl className="grid h-[68px] w-[342px] shrink-0 grid-cols-3 divide-x divide-[#555] rounded-xl border border-[#555] bg-white">
@@ -134,7 +134,7 @@ export default async function LandscapeWeather() {
         <section className="mt-2 grid h-[142px] grid-cols-8 gap-1" aria-label="Eight day forecast">
           {dashboard.forecast.map((item, index) => (
             <article className={`flex h-[142px] flex-col items-center rounded-xl border px-1 pt-2 ${item.selected ? 'forecast-selected border-black text-black' : 'border-[#aaa] bg-white text-black'}`} key={`${item.day}-${index}`} aria-label={`${item.day}, high ${item.high} degrees, low ${item.low} degrees`}>
-              <h2 className="text-base leading-none font-semibold tracking-tight">{item.day}</h2>
+              <h2 className="forecast-day-label">{item.day}</h2>
               <WeatherIcon kind={item.kind} />
               <p className="mt-auto mb-2 grid w-full grid-cols-2 text-[18px] leading-none text-[#555]"><strong className="justify-self-end pr-[3px] font-semibold text-black">{item.high}°</strong><span className="justify-self-start pl-[6px]">{item.low}°</span></p>
             </article>

@@ -246,24 +246,44 @@ button { font: inherit; }
 
 .epaper-landscape .chart-line { height: 2px; }
 
+.epaper-landscape .landscape-city {
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.epaper-landscape .current-condition {
+  align-self: stretch;
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  margin-left: 16px;
+  place-items: center;
+  text-align: center;
+}
+
 .epaper-landscape .current-condition-title {
   overflow: hidden;
+  width: 100%;
   max-width: 100%;
-  padding-bottom: 0.2em;
-  font-size: 24px;
-  line-height: 1.2;
+  margin: 0;
+  padding: 0.12em 0;
+  font-size: 30px;
+  line-height: 1.15;
   font-weight: 700;
   letter-spacing: -0.02em;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .epaper-landscape .current-metric-label {
   color: var(--dark);
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
@@ -272,6 +292,13 @@ button { font: inherit; }
   font-size: 24px;
   line-height: 1;
   font-weight: 700;
+}
+
+.epaper-landscape .forecast-day-label {
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .epaper-portrait .portrait-day-condition {
@@ -301,9 +328,17 @@ button { font: inherit; }
   line-height: 1.2;
 }
 
+.epaper-portrait .portrait-detail-item {
+  display: grid;
+  min-width: 0;
+  place-content: center;
+  padding: 0 4px;
+  text-align: center;
+}
+
 .epaper-portrait .portrait-detail-label {
   color: var(--dark);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.05;
   font-weight: 700;
   text-transform: uppercase;
@@ -311,9 +346,10 @@ button { font: inherit; }
 
 .epaper-portrait .portrait-detail-value {
   margin-top: 3px;
-  font-size: 17px;
+  font-size: 20px;
   line-height: 1;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .forecast-selected {

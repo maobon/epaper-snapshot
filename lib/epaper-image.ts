@@ -38,12 +38,13 @@ function text(
   value: unknown,
   size = 12,
   weight: 400 | 700 = 400,
-  options: { anchor?: 'start' | 'middle' | 'end'; fill?: string; spacing?: number } = {},
+  options: { anchor?: 'start' | 'middle' | 'end'; baseline?: 'middle'; fill?: string; spacing?: number } = {},
 ) {
   const anchor = options.anchor ?? 'start';
   const fill = options.fill ?? BLACK;
   const spacing = options.spacing ?? 0;
-  return `<text x="${x}" y="${y}" font-family="Inter" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" fill="${fill}" letter-spacing="${spacing}">${escapeXml(value)}</text>`;
+  const baseline = options.baseline ? ` dominant-baseline="${options.baseline}"` : '';
+  return `<text x="${x}" y="${y}" font-family="Inter" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" fill="${fill}" letter-spacing="${spacing}"${baseline}>${escapeXml(value)}</text>`;
 }
 
 function rect(x: number, y: number, width: number, height: number, radius = 0, stroke = DARK, fill = WHITE, strokeWidth = 2) {
@@ -196,17 +197,17 @@ async function landscapeSvg() {
   const loaded = await loadLandscapeDashboard();
   const data = loaded.data;
   let body = '<defs><pattern id="forecast-selected-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#aaaaaa" stroke-width="1"/></pattern></defs>' + rect(1, 1, 798, 478, 0, BLACK, WHITE, 2);
-  body += rect(15, 15, 84, 31, 16, DARK, WHITE, 2) + text(27, 36, data.city, 14, 700);
+  body += text(15, 39, data.city, 20, 700, { spacing: 0.2 });
   body += text(785, 38, data.dateLabel, 20, 700, { anchor: 'end', fill: DARK });
   body += rect(15, 55, 770, 99, 16, DARK, WHITE, 2);
   body += weatherIcon(data.current.kind, 31, 72, 64, BLACK);
   body += text(114, 127, data.current.temp, 60, 700) + text(187, 100, '°C', 22, 700);
-  body += text(327, 112, data.current.condition, 24, 700, { anchor: 'middle' });
+  body += text(322, 104.5, data.current.condition, 30, 700, { anchor: 'middle', baseline: 'middle' });
   const metrics = [['RAIN', `${data.current.rain}%`], ['HUMIDITY', `${data.current.humidity}%`], ['WIND', `${data.current.wind} km/h`]];
   metrics.forEach(([label, value], index) => {
     const x = 427 + index * 113;
     body += rect(x, 71, 114, 66, index === 0 ? 12 : index === 2 ? 12 : 0, DARK, WHITE, 1);
-    body += text(x + 57, 96, label, 14, 700, { anchor: 'middle', fill: DARK, spacing: 0.8 }) + text(x + 57, 126, value, 24, 700, { anchor: 'middle' });
+    body += text(x + 57, 98, label, 18, 700, { anchor: 'middle', fill: DARK, spacing: 0.35 }) + text(x + 57, 126, value, 24, 700, { anchor: 'middle' });
   });
   body += rect(15, 163, 770, 153, 16, DARK, WHITE, 2) + text(29, 188, 'Next 24 hours', 14, 700);
   const temperatures = data.hourly.map((hour) => hour.temp), min = Math.min(...temperatures), max = Math.max(...temperatures), span = Math.max(1, max - min);
@@ -219,7 +220,7 @@ async function landscapeSvg() {
     const x = 15 + index * 97;
     const selected = index === 0;
     body += rect(x, 325, 92, 141, 12, selected ? BLACK : LIGHT, selected ? 'url(#forecast-selected-hatch)' : WHITE, 2);
-    body += text(x + 46, 351, day.day, 16, 700, { anchor: 'middle' });
+    body += text(x + 46, 352, day.day, 20, 700, { anchor: 'middle' });
     body += weatherIcon(day.kind, x + 24, 369, 44, BLACK);
     body += text(x + 43, 452, `${day.high}°`, 18, 700, { anchor: 'end' });
     body += text(x + 52, 452, `${day.low}°`, 18, 400, { fill: DARK });
@@ -240,7 +241,7 @@ async function portraitSvg() {
   body += text(350, 70, `Wind ${data.day.wind} ${data.windUnit}`, 17, 700) + text(350, 94, `Gust · Level ${data.day.gustLevel}`, 17, 700);
   body += line(20, 122, 460, 122, LIGHT, 1);
   const detail = [['FEELS LIKE', `${data.day.feels}°`], ['VISIBILITY', `${data.day.visibility} ${data.distanceUnit}`], ['UV INDEX', data.day.uv], ['CLOUD', `${data.day.cloud}%`]];
-  detail.forEach(([label, value], index) => { const x = 20 + index * 110; if (index) body += line(x, 130, x, 184, LIGHT, 1); body += text(x + 55, 153, label, 12, 700, { anchor: 'middle', fill: DARK, spacing: 0.3 }) + text(x + 55, 177, value, 17, 700, { anchor: 'middle' }); });
+  detail.forEach(([label, value], index) => { const x = 20 + index * 110; if (index) body += line(x, 130, x, 184, LIGHT, 1); body += text(x + 55, 154, label, 14, 700, { anchor: 'middle', fill: DARK, spacing: 0.2 }) + text(x + 55, 179, value, 20, 700, { anchor: 'middle' }); });
   body += rect(10, 201, 460, 96, 14, DARK, WHITE, 2) + sectionTitle(225, 'NIGHT', '18:00 — 06:00');
   body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 170, 235, 38, DARK) + text(216, 265, data.night.condition.toUpperCase(), 15, 700) + text(350, 253, `Wind ${data.night.wind} ${data.windUnit}`, 17, 700) + text(350, 277, `Gust · Level ${data.night.gustLevel}`, 17, 700);
   body += rect(10, 304, 460, 123, 14, DARK, WHITE, 2) + sectionTitle(328, 'HOURLY AQI FORECAST', 'LIVE') + line(20, 410, 460, 410, LIGHT, 1);
@@ -257,7 +258,7 @@ async function portraitSvg() {
   });
   const high = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${679 - (day.high - Math.min(...data.forecast.map((item) => item.high))) * 4.5}`).join(' ');
   const low = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${737 - (day.low - Math.min(...data.forecast.map((item) => item.low))) * 4.5}`).join(' ');
-  body += `<path d="${high}" fill="none" stroke="${BLACK}" stroke-width="2"/><path d="${low}" fill="none" stroke="${LIGHT}" stroke-width="2"/>`;
+  body += `<path d="${high}" fill="none" stroke="${LIGHT}" stroke-width="2"/><path d="${low}" fill="none" stroke="${LIGHT}" stroke-width="2"/>`;
   return { svg: svgDocument(480, 800, body), manifest: createRenderManifest('portrait', loaded.source, data) };
 }
 

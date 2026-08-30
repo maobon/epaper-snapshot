@@ -5,10 +5,8 @@ import { CloudRainIcon } from '@phosphor-icons/react/dist/ssr/CloudRain';
 import { CloudSnowIcon } from '@phosphor-icons/react/dist/ssr/CloudSnow';
 import { CloudMoonIcon } from '@phosphor-icons/react/dist/ssr/CloudMoon';
 import { CloudSunIcon } from '@phosphor-icons/react/dist/ssr/CloudSun';
-import { EyeIcon } from '@phosphor-icons/react/dist/ssr/Eye';
 import { MoonStarsIcon } from '@phosphor-icons/react/dist/ssr/MoonStars';
 import { SunIcon } from '@phosphor-icons/react/dist/ssr/Sun';
-import { ThermometerSimpleIcon } from '@phosphor-icons/react/dist/ssr/ThermometerSimple';
 import { WindIcon } from '@phosphor-icons/react/dist/ssr/Wind';
 import { createRenderManifest, serializeRenderManifest } from '@/lib/render-monitor';
 import { fallbackPortrait, loadPortraitDashboard } from '@/lib/weather-dashboard';
@@ -53,10 +51,10 @@ export default async function PortraitWeather() {
             <dl className="portrait-wind-details w-[126px] justify-self-end space-y-2"><div className="flex items-center gap-1.5 whitespace-nowrap"><WindIcon size={16} weight="light" /><dt className="sr-only">Wind</dt><dd><b>Wind</b> {dashboard.day.wind} {dashboard.windUnit}</dd></div><div className="flex items-center gap-1.5 whitespace-nowrap"><WindIcon className="rotate-180" size={16} weight="light" /><dt className="sr-only">Wind gust level</dt><dd><b>Gust</b> · Level {dashboard.day.gustLevel}</dd></div></dl>
           </div>
           <dl className="grid h-[64px] grid-cols-4 divide-x divide-[#aaa] border-t border-[#aaa] pt-1.5">
-            <div className="flex items-center gap-1.5 px-1"><ThermometerSimpleIcon color="#555" size={20} weight="light" /><div className="min-w-0 flex-1 text-center"><dt className="portrait-detail-label">Feels like</dt><dd className="portrait-detail-value">{dashboard.day.feels}°</dd></div></div>
-            <div className="flex items-center gap-1.5 px-2"><EyeIcon color="#555" size={20} weight="light" /><div className="min-w-0 flex-1 text-center"><dt className="portrait-detail-label">Visibility</dt><dd className="portrait-detail-value">{dashboard.day.visibility} {dashboard.distanceUnit}</dd></div></div>
-            <div className="flex items-center gap-1.5 px-2"><span className="grid h-5 w-5 place-items-center rounded-full border border-[#555] text-[9px] font-semibold text-[#555]">UV</span><div className="min-w-0 flex-1 text-center"><dt className="portrait-detail-label">UV index</dt><dd className="portrait-detail-value">{dashboard.day.uv}</dd></div></div>
-            <div className="flex items-center gap-1.5 px-2"><CloudIcon color="#555" size={20} weight="light" /><div className="min-w-0 flex-1 text-center"><dt className="portrait-detail-label">Cloud</dt><dd className="portrait-detail-value">{dashboard.day.cloud}%</dd></div></div>
+            <div className="portrait-detail-item"><dt className="portrait-detail-label">Feels like</dt><dd className="portrait-detail-value">{dashboard.day.feels}°</dd></div>
+            <div className="portrait-detail-item"><dt className="portrait-detail-label">Visibility</dt><dd className="portrait-detail-value">{dashboard.day.visibility} {dashboard.distanceUnit}</dd></div>
+            <div className="portrait-detail-item"><dt className="portrait-detail-label">UV index</dt><dd className="portrait-detail-value">{dashboard.day.uv}</dd></div>
+            <div className="portrait-detail-item"><dt className="portrait-detail-label">Cloud</dt><dd className="portrait-detail-value">{dashboard.day.cloud}%</dd></div>
           </dl>
         </section>
         <section className="h-[96px] shrink-0 rounded-2xl border border-[#555] bg-white p-2" aria-label="Night weather">
@@ -70,7 +68,7 @@ export default async function PortraitWeather() {
         <section className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#555] bg-white p-2" aria-label="Seven day weather forecast">
           <header className="flex h-5 items-center justify-between"><h2 className="text-sm font-semibold">7-DAY FORECAST</h2><span className="text-xs text-[#555]">LIVE</span></header>
           <div className="mt-1 grid h-[128px] grid-cols-7">{dashboard.forecast.map((item) => { const Icon = weatherIcons[item.kind]; return <article className="flex min-w-0 flex-col items-center justify-between pb-3 text-center" key={item.date}><p className="text-[9px] text-[#555]">{item.date}</p><h3 className="text-[10px] font-semibold">{item.day}</h3><Icon color="#555" size={32} weight="light" aria-hidden="true" /><p className="portrait-forecast-condition w-full px-0.5 text-[9px]"><span>{item.condition}</span></p></article>; })}</div>
-          <div className="relative h-[130px]"><TemperatureLine color="#000" points={highPoints} /><TemperatureLine color="#aaa" points={lowPoints} />{dashboard.forecast.map((item, index) => <div className="absolute top-0 flex h-[130px] w-[52px] -translate-x-1/2 flex-col justify-between text-center text-[10px] font-semibold" key={`temperature-${item.date}`} style={{ left: highPoints[index].x }}><span className="text-[16px] leading-none">{item.high}°</span><span className="relative top-[18px] text-[16px] leading-none text-[#555]">{item.low}°</span></div>)}</div>
+          <div className="relative h-[130px]"><TemperatureLine color="#aaa" points={highPoints} /><TemperatureLine color="#aaa" points={lowPoints} />{dashboard.forecast.map((item, index) => <div className="absolute top-0 flex h-[130px] w-[52px] -translate-x-1/2 flex-col justify-between text-center text-[10px] font-semibold" key={`temperature-${item.date}`} style={{ left: highPoints[index].x }}><span className="text-[16px] leading-none">{item.high}°</span><span className="relative top-[18px] text-[16px] leading-none text-[#555]">{item.low}°</span></div>)}</div>
           <div className="grid h-[55px] grid-cols-7">{dashboard.forecast.map((item) => <div className="flex translate-y-2 flex-col items-center justify-center text-[9px]" key={`wind-${item.date}`}><span>{item.wind}</span><span>{item.level} Level</span></div>)}</div>
         </section>
       </section>
