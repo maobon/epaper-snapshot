@@ -135,7 +135,10 @@ function chromeProcessGroupExists(pid) {
     process.kill(-pid, 0);
     return true;
   } catch (error) {
-    if (error?.code === 'ESRCH') return false;
+    // macOS can return EPERM after Chrome has handed work to a process group
+    // that the launcher can no longer signal. Cleanup must not turn an
+    // otherwise successful snapshot export into a failure in that case.
+    if (error?.code === 'ESRCH' || error?.code === 'EPERM') return false;
     throw error;
   }
 }

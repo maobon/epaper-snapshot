@@ -326,6 +326,7 @@ button { font: inherit; }
 .epaper-portrait .portrait-wind-details {
   font-size: 17px;
   line-height: 1.2;
+  transform: translateX(15px);
 }
 
 .epaper-portrait .portrait-detail-item {
@@ -402,14 +403,14 @@ button { font: inherit; }
 
 /* The 15-day screen is viewed at native 480 px width, so keep every data point
    comfortably readable without changing the fixed 15-row layout. */
-.epaper-forecast15 .forecast15-title { font-size: 19px; }
-.epaper-forecast15 .forecast15-header .forecast15-subtitle { font-size: 11px; }
-.epaper-forecast15 .forecast15-day { font-size: 16px; line-height: 1.05; }
-.epaper-forecast15 .forecast15-date { font-size: 14px; line-height: 1.05; }
-.epaper-forecast15 .forecast15-temperature { font-size: 16px; line-height: 1.1; }
-.epaper-forecast15 .forecast15-rain { font-size: 16px; line-height: 1.1; }
-.epaper-forecast15 .forecast15-wind { font-size: 16px; line-height: 1.1; }
-.epaper-forecast15 .forecast15-condition { font-size: 14px; line-height: 1.1; }
+.epaper-forecast15 .forecast15-title { font-size: 21px; }
+.epaper-forecast15 .forecast15-header .forecast15-subtitle { font-size: 12px; }
+.epaper-forecast15 .forecast15-day { font-size: 18px; line-height: 1.05; }
+.epaper-forecast15 .forecast15-date { font-size: 15px; line-height: 1.05; }
+.epaper-forecast15 .forecast15-temperature { font-size: 18px; line-height: 1.1; }
+.epaper-forecast15 .forecast15-rain { font-size: 18px; line-height: 1.1; }
+.epaper-forecast15 .forecast15-wind { font-size: 17px; line-height: 1.1; }
+.epaper-forecast15 .forecast15-condition { font-size: 15px; line-height: 1.1; }
 
 .epaper-portrait .portrait-forecast-condition {
   display: flex;
