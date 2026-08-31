@@ -8,7 +8,7 @@ import { CloudSunIcon } from '@phosphor-icons/react/dist/ssr/CloudSun';
 import { MoonStarsIcon } from '@phosphor-icons/react/dist/ssr/MoonStars';
 import { SunIcon } from '@phosphor-icons/react/dist/ssr/Sun';
 import { createRenderManifest, serializeRenderManifest } from '@/lib/render-monitor';
-import { fallbackPortrait, loadPortraitDashboard } from '@/lib/weather-dashboard';
+import { loadPortraitDashboard } from '@/lib/weather-dashboard';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,6 @@ export const metadata: Metadata = {
 
 const weatherIcons = { rain: CloudRainIcon, storm: CloudLightningIcon, snow: CloudSnowIcon, partly: CloudSunIcon, cloudy: CloudIcon, sunny: SunIcon, 'night-clear': MoonStarsIcon, 'partly-small': CloudMoonIcon };
 
-function aqiLabel(value: number) { return value <= 50 ? 'EXCELLENT' : value <= 100 ? 'GOOD' : value <= 150 ? 'LIGHT' : 'POLLUTED'; }
 function seriesPoints(values: number[], top: number, bottom: number) {
   const min = Math.min(...values), max = Math.max(...values), span = Math.max(1, max - min);
   return values.map((value, index) => ({ x: ((index + 0.5) * 440) / values.length, y: bottom - ((value - min) / span) * (bottom - top) }));
@@ -35,9 +34,8 @@ export default async function PortraitWeather() {
   const dashboard = loaded.data;
   const manifest = createRenderManifest('portrait', loaded.source, dashboard);
   const DayIcon = weatherIcons[dashboard.day.kind], NightIcon = weatherIcons[dashboard.night.kind];
-  const highPoints = seriesPoints(dashboard.forecast.map((item) => item.high), 22, 54);
-  const lowPoints = seriesPoints(dashboard.forecast.map((item) => item.low), 84, 116);
-  const hourly = dashboard.hourly.length === 13 ? dashboard.hourly : fallbackPortrait.hourly;
+  const highPoints = seriesPoints(dashboard.forecast.map((item) => item.high), 50, 95);
+  const lowPoints = seriesPoints(dashboard.forecast.map((item) => item.low), 155, 200);
   return (
     <main className="portrait-stage grid min-h-screen min-w-[480px] place-items-center bg-white font-sans text-black">
       <script id="render-monitor-manifest" type="application/json" dangerouslySetInnerHTML={{ __html: serializeRenderManifest(manifest) }} />
@@ -50,7 +48,7 @@ export default async function PortraitWeather() {
             <dl className="portrait-wind-details w-[126px] justify-self-end space-y-2"><div className="whitespace-nowrap"><dt className="sr-only">Wind</dt><dd><b>Wind</b> {dashboard.day.wind} {dashboard.windUnit}</dd></div><div className="whitespace-nowrap"><dt className="sr-only">Wind gust level</dt><dd><b>Gust</b> · Level {dashboard.day.gustLevel}</dd></div></dl>
           </div>
           <dl className="grid h-[64px] grid-cols-4 divide-x divide-[#aaa] border-t border-[#aaa] pt-1.5">
-            <div className="portrait-detail-item"><dt className="portrait-detail-label">Feels like</dt><dd className="portrait-detail-value">{dashboard.day.feels}°</dd></div>
+            <div className="portrait-detail-item"><dt className="portrait-detail-label">AQI</dt><dd className="portrait-detail-value">{dashboard.day.aqi}</dd></div>
             <div className="portrait-detail-item"><dt className="portrait-detail-label">Visibility</dt><dd className="portrait-detail-value">{dashboard.day.visibility} {dashboard.distanceUnit}</dd></div>
             <div className="portrait-detail-item"><dt className="portrait-detail-label">UV index</dt><dd className="portrait-detail-value">{dashboard.day.uv}</dd></div>
             <div className="portrait-detail-item"><dt className="portrait-detail-label">Cloud</dt><dd className="portrait-detail-value">{dashboard.day.cloud}%</dd></div>
@@ -60,15 +58,11 @@ export default async function PortraitWeather() {
           <header className="flex h-5 items-center justify-between text-xs font-semibold"><h2 className="tracking-wide">NIGHT</h2><p className="text-[#555]">18:00 — 06:00</p></header>
           <div className="grid h-[58px] grid-cols-[120px_minmax(0,1fr)_150px] items-center gap-2"><div className="flex items-start"><strong className="text-[56px] leading-none tracking-[-3px]">{dashboard.night.temp}</strong><span className="text-2xl leading-none">°</span></div><div className="relative flex w-full items-center justify-center"><NightIcon className="absolute left-0" color="#555" size={35} weight="light" /><span className="portrait-night-condition">{dashboard.night.condition}</span></div><dl className="portrait-wind-details w-[126px] justify-self-end space-y-1.5"><div className="whitespace-nowrap"><dt className="sr-only">Wind</dt><dd><b>Wind</b> {dashboard.night.wind} {dashboard.windUnit}</dd></div><div className="whitespace-nowrap"><dt className="sr-only">Wind gust level</dt><dd><b>Gust</b> · Level {dashboard.night.gustLevel}</dd></div></dl></div>
         </section>
-        <section className="h-[124px] shrink-0 rounded-2xl border border-[#555] bg-white p-2" aria-label="Hourly air quality forecast">
-          <header className="flex h-5 items-center justify-between"><h2 className="text-sm font-semibold">HOURLY AQI FORECAST</h2><span className="text-xs text-[#555]">LIVE</span></header>
-          <div className="relative mt-1 grid h-[76px] grid-cols-13 items-end border-b border-[#aaa] px-1">{hourly.map((item, index) => <div className="flex h-full flex-col items-center justify-end" key={`${item.time}-${index}`}>{index === 0 && <span className="absolute top-0 rounded bg-[#555] px-1 py-0.5 text-[9px] text-white">{item.value} · {aqiLabel(item.value)}</span>}<i className={`${item.level <= 1 ? 'bg-[#555]' : 'bg-black'} w-2 rounded-t-full`} style={{ height: `${Math.max(15, item.value * 0.48)}px` }} /><span className="mt-1 text-[9px] text-[#555]">{item.time}</span></div>)}</div>
-        </section>
         <section className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#555] bg-white p-2" aria-label="Seven day weather forecast">
-          <header className="flex h-5 items-center justify-between"><h2 className="text-sm font-semibold">7-DAY FORECAST</h2><span className="text-xs text-[#555]">LIVE</span></header>
-          <div className="mt-1 grid h-[128px] grid-cols-7">{dashboard.forecast.map((item) => { const Icon = weatherIcons[item.kind]; return <article className="flex min-w-0 flex-col items-center justify-between pb-3 text-center" key={item.date}><p className="text-[9px] text-[#555]">{item.date}</p><h3 className="portrait-forecast-day">{item.day}</h3><Icon color="#555" size={32} weight="light" aria-hidden="true" /><p className="portrait-forecast-condition w-full px-0.5"><span>{item.condition}</span></p></article>; })}</div>
-          <div className="relative h-[130px]"><TemperatureLine color="#aaa" points={highPoints} /><TemperatureLine color="#aaa" points={lowPoints} />{dashboard.forecast.map((item, index) => <div className="absolute top-0 flex h-[130px] w-[52px] -translate-x-1/2 flex-col justify-between text-center text-[10px] font-semibold" key={`temperature-${item.date}`} style={{ left: highPoints[index].x }}><span className="text-[16px] leading-none">{item.high}°</span><span className="relative top-[18px] text-[16px] leading-none text-[#555]">{item.low}°</span></div>)}</div>
-          <div className="grid h-[55px] grid-cols-7">{dashboard.forecast.map((item) => <div className="portrait-forecast-wind flex translate-y-[15px] flex-col items-center justify-center" key={`wind-${item.date}`}><span>{item.wind}</span><span>{item.level} Level</span></div>)}</div>
+          <header className="flex h-5 items-center"><h2 className="text-sm font-semibold">7-DAY FORECAST</h2></header>
+          <div className="mt-1 grid h-[128px] grid-cols-7">{dashboard.forecast.map((item) => { const Icon = weatherIcons[item.kind]; return <article className="flex min-w-0 flex-col items-center justify-between pb-3 text-center" key={item.date}><p className="portrait-forecast-date translate-y-[10px] text-[#555]">{item.date}</p><h3 className="portrait-forecast-day translate-y-[15px]">{item.day}</h3><Icon className="translate-y-[15px]" color="#555" size={32} weight="light" aria-hidden="true" /><p className="portrait-forecast-condition w-full translate-y-[15px] px-0.5"><span>{item.condition}</span></p></article>; })}</div>
+          <div className="relative h-[250px]"><TemperatureLine color="#aaa" points={highPoints} /><TemperatureLine color="#aaa" points={lowPoints} />{dashboard.forecast.map((item, index) => <div className="absolute top-0 flex h-[230px] w-[52px] -translate-x-1/2 flex-col justify-between text-center text-[10px] font-semibold" key={`temperature-${item.date}`} style={{ left: highPoints[index].x }}><span className="relative top-[15px] text-[16px] leading-none">{item.high}°</span><span className="relative top-[18px] text-[16px] leading-none text-[#555]">{item.low}°</span></div>)}</div>
+          <div className="grid h-[55px] grid-cols-7">{dashboard.forecast.map((item) => <div className="portrait-forecast-wind flex translate-y-[5px] flex-col items-center justify-center" key={`wind-${item.date}`}><span>{item.wind}</span><span>{item.level} Level</span></div>)}</div>
         </section>
       </section>
     </main>

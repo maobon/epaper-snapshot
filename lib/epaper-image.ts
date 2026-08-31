@@ -240,24 +240,21 @@ async function portraitSvg() {
   body += text(20, 106, data.day.temp, 68, 700) + text(91, 65, '°', 26, 700) + weatherIcon(data.day.kind, 201, 47, 48, DARK) + text(225, 111, data.day.condition.toUpperCase(), 20, 700, { anchor: 'middle' });
   body += text(350, 70, `Wind ${data.day.wind} ${data.windUnit}`, 17, 700) + text(350, 94, `Gust · Level ${data.day.gustLevel}`, 17, 700);
   body += line(20, 122, 460, 122, LIGHT, 1);
-  const detail = [['FEELS LIKE', `${data.day.feels}°`], ['VISIBILITY', `${data.day.visibility} ${data.distanceUnit}`], ['UV INDEX', data.day.uv], ['CLOUD', `${data.day.cloud}%`]];
+  const detail = [['AQI', `${data.day.aqi}`], ['VISIBILITY', `${data.day.visibility} ${data.distanceUnit}`], ['UV INDEX', data.day.uv], ['CLOUD', `${data.day.cloud}%`]];
   detail.forEach(([label, value], index) => { const x = 20 + index * 110; if (index) body += line(x, 130, x, 184, LIGHT, 1); body += text(x + 55, 154, label, 14, 700, { anchor: 'middle', fill: DARK, spacing: 0.2 }) + text(x + 55, 179, value, 20, 700, { anchor: 'middle' }); });
   body += rect(10, 201, 460, 96, 14, DARK, WHITE, 2) + sectionTitle(225, 'NIGHT', '18:00 — 06:00');
   body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 142, 235, 38, DARK) + text(188, 265, data.night.condition.toUpperCase(), 18, 700) + text(350, 253, `Wind ${data.night.wind} ${data.windUnit}`, 17, 700) + text(350, 277, `Gust · Level ${data.night.gustLevel}`, 17, 700);
-  body += rect(10, 304, 460, 123, 14, DARK, WHITE, 2) + sectionTitle(328, 'HOURLY AQI FORECAST', 'LIVE') + line(20, 410, 460, 410, LIGHT, 1);
-  const aqi = data.hourly;
-  aqi.forEach((item, index) => { const x = 40 + index * 33; const height = Math.max(14, Math.min(45, item.value * 0.45)); body += `<rect x="${x - 4}" y="${402 - height}" width="8" height="${height}" rx="3" fill="${index === 0 ? DARK : LIGHT}"/>` + text(x, 420, item.time, 9, 700, { anchor: 'middle', fill: DARK }); });
-  body += rect(10, 434, 460, 356, 14, DARK, WHITE, 2) + sectionTitle(458, '7-DAY FORECAST', 'LIVE');
+  body += rect(10, 304, 460, 486, 14, DARK, WHITE, 2) + sectionTitle(328, '7-DAY FORECAST');
   const forecastX = (index: number) => 20 + ((index + 0.5) * 440) / data.forecast.length;
   data.forecast.forEach((day, index) => {
     const x = forecastX(index);
     const conditionLines = wrapTextLines(day.condition, 11);
-    body += text(x, 499, day.date, 9, 700, { anchor: 'middle', fill: DARK }) + text(x, 522, day.day, 11, 700, { anchor: 'middle' }) + weatherIcon(day.kind, x - 16, 529, 32, DARK);
-    body += conditionLines.map((condition, lineIndex) => text(x, conditionLines.length === 1 ? 600 : 594 + lineIndex * 12, condition, 11, 700, { anchor: 'middle' })).join('');
-    body += text(x, 651, `${day.high}°`, 16, 700, { anchor: 'middle' }) + text(x, 735, `${day.low}°`, 16, 700, { anchor: 'middle', fill: DARK }) + text(x, 785, `${day.wind} · ${day.level}`, 11, 700, { anchor: 'middle' });
+    body += text(x, 379, day.date, 13, 700, { anchor: 'middle', fill: DARK }) + text(x, 407, day.day, 13, 700, { anchor: 'middle' }) + weatherIcon(day.kind, x - 16, 414, 32, DARK);
+    body += conditionLines.map((condition, lineIndex) => text(x, conditionLines.length === 1 ? 487 : 475 + lineIndex * 15, condition, 13, 700, { anchor: 'middle' })).join('');
+    body += text(x, 535, `${day.high}°`, 16, 700, { anchor: 'middle' }) + text(x, 697, `${day.low}°`, 16, 700, { anchor: 'middle', fill: DARK }) + text(x, 760, day.wind, 13, 700, { anchor: 'middle' }) + text(x, 778, `${day.level} Level`, 13, 700, { anchor: 'middle' });
   });
-  const high = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${679 - (day.high - Math.min(...data.forecast.map((item) => item.high))) * 4.5}`).join(' ');
-  const low = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${737 - (day.low - Math.min(...data.forecast.map((item) => item.low))) * 4.5}`).join(' ');
+  const high = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${615 - (day.high - Math.min(...data.forecast.map((item) => item.high))) * 6}`).join(' ');
+  const low = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${735 - (day.low - Math.min(...data.forecast.map((item) => item.low))) * 6}`).join(' ');
   body += `<path d="${high}" fill="none" stroke="${LIGHT}" stroke-width="2"/><path d="${low}" fill="none" stroke="${LIGHT}" stroke-width="2"/>`;
   return { svg: svgDocument(480, 800, body), manifest: createRenderManifest('portrait', loaded.source, data) };
 }

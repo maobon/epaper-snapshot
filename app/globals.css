@@ -416,14 +416,26 @@ button { font: inherit; }
   height: 2.4em;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.2;
 }
 
-.epaper-portrait .portrait-forecast-day,
+.epaper-portrait .portrait-forecast-date {
+  font-size: 15px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
+.epaper-portrait .portrait-forecast-day {
+  font-size: 15px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
 .epaper-portrait .portrait-forecast-wind {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.1;
   font-weight: 700;
 }

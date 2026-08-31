@@ -96,11 +96,10 @@ export type PortraitForecastDay = { date: string; day: string; condition: string
 export type PortraitDashboard = {
   city: string;
   dateLabel: string;
-  day: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gustLevel: number; feels: number; visibility: number; uv: string; cloud: number };
+  day: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gustLevel: number; aqi: number; visibility: number; uv: string; cloud: number };
   night: { temp: number; kind: WeatherDisplayKind; condition: string; wind: number; gustLevel: number };
   distanceUnit: string;
   windUnit: string;
-  hourly: Array<{ time: string; value: number; level: number }>;
   life: { dressing: string; carWash: string; sports: string; colds: string };
   forecast: PortraitForecastDay[];
 };
@@ -112,9 +111,8 @@ const fallbackPortraitForecast: PortraitForecastDay[] = [
 
 export const fallbackPortrait: PortraitDashboard = {
   city: DISPLAY_CITY, dateLabel: '08/25 TUE', distanceUnit: 'km', windUnit: 'km/h',
-  day: { temp: 30, kind: 'rain', condition: 'Moderate rain', wind: 10, gustLevel: 3, feels: 34, visibility: 6, uv: 'Moderate', cloud: 95 },
+  day: { temp: 30, kind: 'rain', condition: 'Moderate rain', wind: 10, gustLevel: 3, aqi: 33, visibility: 6, uv: 'Moderate', cloud: 95 },
   night: { temp: 21, kind: 'storm', condition: 'Thunderstorms', wind: 10, gustLevel: 3 },
-  hourly: [33, 30, 31, 37, 34, 36, 40, 35, 42, 60, 59, 55, 68].map((value, index) => ({ time: String(index).padStart(2, '0'), value, level: value <= 50 ? 1 : 2 })),
   life: { dressing: 'Short sleeve', carWash: 'Not suitable', sports: 'Not suitable', colds: 'Easier' },
   forecast: fallbackPortraitForecast,
 };
@@ -140,7 +138,7 @@ export async function loadPortraitDashboard(): Promise<MonitoredData<PortraitDas
   type Condition = { winddir?: string; windGustPow?: number; windlevel?: number; windspeed?: number; weaIcon?: string };
   type Day = { publicDate: string; maxtemp?: number; mintemp?: number; dayWeaName?: string; nightWeaName?: string; conditionDay?: Condition; conditionNight?: Condition };
   type DailySource = { cityInfo?: { localizedName?: string; englishName?: string; name?: string }; currentTime?: string; disUnit?: string; windSpeedUnit?: string; forecastList?: { dailyWeathers?: Day[] }; lifeIndex?: Array<{ code?: string; levelList?: Array<{ day?: string; level?: string }> }> };
-  type HourlySource = { actual?: { temperature?: number; realfeel?: number; visibility?: number; cloudCover?: number; uvindex?: number; windspeed?: number; windgustlevel?: number; weaName?: string; weaIcon?: string }; hourly?: Array<{ time?: string; aqi?: number; isdaynight?: boolean }> };
+  type HourlySource = { actual?: { temperature?: number; aqi?: number; visibility?: number; cloudCover?: number; uvindex?: number; windspeed?: number; windgustlevel?: number; weaName?: string; weaIcon?: string }; hourly?: Array<{ aqi?: number; isdaynight?: boolean }> };
   try {
     const [source, hourlySource] = await Promise.all([fetchDailyWeather<DailySource>(), fetchHourlyWeather<HourlySource>()]);
     if (!source.currentTime || !hourlySource.actual) throw new Error('Weather source omitted current portrait conditions');
@@ -159,16 +157,13 @@ export async function loadPortraitDashboard(): Promise<MonitoredData<PortraitDas
     });
     if (forecast.length !== 7) throw new Error('Weather source returned an incomplete portrait forecast');
     const lifeValue = (code: string) => source.lifeIndex?.find((item) => item.code === code)?.levelList?.find((item) => item.day === source.currentTime)?.level;
-    const hourly = (hourlySource.hourly ?? []).slice(0, 13).map((item, index) => { const value = item.aqi ?? 0; return { time: item.time?.slice(11, 13) ?? String(index).padStart(2, '0'), value, level: value <= 50 ? 1 : value <= 100 ? 2 : 3 }; });
-    if (hourly.length !== 13) throw new Error('Weather source returned an incomplete AQI forecast');
     return { source: 'live', data: {
       city: DISPLAY_CITY,
       dateLabel: `${currentDate.mmdd} ${currentDate.weekday.toUpperCase()}`,
-      day: { temp: hourlySource.actual.temperature ?? fallbackPortrait.day.temp, kind: dayWeather.kind, condition: dayWeather.label, wind: hourlySource.actual.windspeed ?? fallbackPortrait.day.wind, gustLevel: hourlySource.actual.windgustlevel ?? fallbackPortrait.day.gustLevel, feels: hourlySource.actual.realfeel ?? fallbackPortrait.day.feels, visibility: hourlySource.actual.visibility ?? fallbackPortrait.day.visibility, uv: uvLabel(hourlySource.actual.uvindex), cloud: hourlySource.actual.cloudCover ?? fallbackPortrait.day.cloud },
+      day: { temp: hourlySource.actual.temperature ?? fallbackPortrait.day.temp, kind: dayWeather.kind, condition: dayWeather.label, wind: hourlySource.actual.windspeed ?? fallbackPortrait.day.wind, gustLevel: hourlySource.actual.windgustlevel ?? fallbackPortrait.day.gustLevel, aqi: hourlySource.actual.aqi ?? currentHour?.aqi ?? fallbackPortrait.day.aqi, visibility: hourlySource.actual.visibility ?? fallbackPortrait.day.visibility, uv: uvLabel(hourlySource.actual.uvindex), cloud: hourlySource.actual.cloudCover ?? fallbackPortrait.day.cloud },
       night: { temp: current.mintemp ?? fallbackPortrait.night.temp, kind: nightWeather.kind, condition: nightWeather.label.replace(/\s+night$/i, ''), wind: current.conditionNight?.windspeed ?? fallbackPortrait.night.wind, gustLevel: current.conditionNight?.windGustPow ?? fallbackPortrait.night.gustLevel },
       distanceUnit: source.disUnit ?? fallbackPortrait.distanceUnit,
       windUnit: source.windSpeedUnit ?? fallbackPortrait.windUnit,
-      hourly,
       life: { dressing: translateLife('2', lifeValue('2')), carWash: translateLife('4', lifeValue('4')), sports: translateLife('5', lifeValue('5')), colds: translateLife('3', lifeValue('3')) },
       forecast,
     } };
