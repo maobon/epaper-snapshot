@@ -249,12 +249,12 @@ async function portraitSvg() {
   data.forecast.forEach((day, index) => {
     const x = forecastX(index);
     const conditionLines = wrapTextLines(day.condition, 11);
-    body += text(x, 379, day.date, 13, 700, { anchor: 'middle', fill: DARK }) + text(x, 407, day.day, 13, 700, { anchor: 'middle' }) + weatherIcon(day.kind, x - 16, 414, 32, DARK);
-    body += conditionLines.map((condition, lineIndex) => text(x, conditionLines.length === 1 ? 487 : 475 + lineIndex * 15, condition, 13, 700, { anchor: 'middle' })).join('');
-    body += text(x, 535, `${day.high}°`, 16, 700, { anchor: 'middle' }) + text(x, 697, `${day.low}°`, 16, 700, { anchor: 'middle', fill: DARK }) + text(x, 760, day.wind, 13, 700, { anchor: 'middle' }) + text(x, 778, `${day.level} Level`, 13, 700, { anchor: 'middle' });
+    body += text(x, 372, day.date, 13, 700, { anchor: 'middle', fill: DARK }) + text(x, 402, day.day, 13, 700, { anchor: 'middle' }) + weatherIcon(day.kind, x - 16, 411, 32, DARK);
+    body += conditionLines.map((condition, lineIndex) => text(x, conditionLines.length === 1 ? 478 : 466 + lineIndex * 15, condition, 13, 700, { anchor: 'middle' })).join('');
+    body += text(x, 530, `${day.high}°`, 16, 700, { anchor: 'middle' }) + text(x, 728, `${day.low}°`, 16, 700, { anchor: 'middle', fill: DARK }) + text(x, 770, `${day.wind} ${day.level}`, 13, 700, { anchor: 'middle' });
   });
-  const high = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${615 - (day.high - Math.min(...data.forecast.map((item) => item.high))) * 6}`).join(' ');
-  const low = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${735 - (day.low - Math.min(...data.forecast.map((item) => item.low))) * 6}`).join(' ');
+  const high = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${610 - (day.high - Math.min(...data.forecast.map((item) => item.high))) * 5}`).join(' ');
+  const low = data.forecast.map((day, index) => `${index ? 'L' : 'M'} ${forecastX(index)} ${686 - (day.low - Math.min(...data.forecast.map((item) => item.low))) * 5}`).join(' ');
   body += `<path d="${high}" fill="none" stroke="${LIGHT}" stroke-width="2"/><path d="${low}" fill="none" stroke="${LIGHT}" stroke-width="2"/>`;
   return { svg: svgDocument(480, 800, body), manifest: createRenderManifest('portrait', loaded.source, data) };
 }
@@ -269,7 +269,7 @@ async function forecast15Svg() {
     body += text(20, y + 18, item.day, 16, 700) + text(20, y + 35, item.date, 13, 700, { fill: DARK });
     body += weatherIcon(item.kind, 94, y + 4, 36, DARK);
     body += text(166, y + 24, `${item.high}°`, 16, 700) + text(203, y + 24, `/ ${item.low}°`, 15, 700, { fill: DARK });
-    body += text(264, y + 24, `${item.rain}%`, 16, 700);
+    body += text(274, y + 24, `${item.rain}%`, 16, 700);
     body += text(460, y + 19, `${item.windDirection} · ${item.windSpeed} ${loaded.data.windSpeedUnit}`, 16, 700, { anchor: 'end' }) + text(460, y + 36, item.condition, 14, 700, { anchor: 'end', fill: DARK });
   });
   return { svg: svgDocument(480, 800, body), manifest: createRenderManifest('forecast-15d', loaded.source, loaded.data) };

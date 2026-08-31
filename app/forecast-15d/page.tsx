@@ -69,7 +69,7 @@ export default async function FifteenDayForecast() {
                 </div>
                 <WeatherIcon className="-translate-x-[10px]" color="#555" size={36} weight="light" aria-hidden="true" />
                 <p className="forecast15-temperature text-[11px] whitespace-nowrap"><strong className="font-semibold">{item.high}°</strong><span className="text-[#555]"> / {item.low}°</span></p>
-                <p className="forecast15-rain flex items-center gap-1 text-[10px]"><DropIcon color="#555" size={13} weight="light" aria-hidden="true" /><span>{item.rain}%</span></p>
+                <p className="forecast15-rain flex translate-x-[10px] items-center gap-1 text-[10px]"><DropIcon color="#555" size={13} weight="light" aria-hidden="true" /><span>{item.rain}%</span></p>
                 <div className="min-w-0 max-w-full justify-self-end text-right leading-tight">
                   <p className="forecast15-wind truncate text-[10px] font-semibold">{item.windDirection} · {item.windSpeed} {windSpeedUnit}</p>
                   <p className="forecast15-condition truncate text-[8px] text-[#555]">{item.condition}</p>

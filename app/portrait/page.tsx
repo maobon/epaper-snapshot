@@ -34,8 +34,8 @@ export default async function PortraitWeather() {
   const dashboard = loaded.data;
   const manifest = createRenderManifest('portrait', loaded.source, dashboard);
   const DayIcon = weatherIcons[dashboard.day.kind], NightIcon = weatherIcons[dashboard.night.kind];
-  const highPoints = seriesPoints(dashboard.forecast.map((item) => item.high), 50, 95);
-  const lowPoints = seriesPoints(dashboard.forecast.map((item) => item.low), 155, 200);
+  const highPoints = seriesPoints(dashboard.forecast.map((item) => item.high), 48, 86);
+  const lowPoints = seriesPoints(dashboard.forecast.map((item) => item.low), 130, 168);
   return (
     <main className="portrait-stage grid min-h-screen min-w-[480px] place-items-center bg-white font-sans text-black">
       <script id="render-monitor-manifest" type="application/json" dangerouslySetInnerHTML={{ __html: serializeRenderManifest(manifest) }} />
@@ -60,9 +60,9 @@ export default async function PortraitWeather() {
         </section>
         <section className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#555] bg-white p-2" aria-label="Seven day weather forecast">
           <header className="flex h-5 items-center"><h2 className="text-sm font-semibold">7-DAY FORECAST</h2></header>
-          <div className="mt-1 grid h-[128px] grid-cols-7">{dashboard.forecast.map((item) => { const Icon = weatherIcons[item.kind]; return <article className="flex min-w-0 flex-col items-center justify-between pb-3 text-center" key={item.date}><p className="portrait-forecast-date translate-y-[10px] text-[#555]">{item.date}</p><h3 className="portrait-forecast-day translate-y-[15px]">{item.day}</h3><Icon className="translate-y-[15px]" color="#555" size={32} weight="light" aria-hidden="true" /><p className="portrait-forecast-condition w-full translate-y-[15px] px-0.5"><span>{item.condition}</span></p></article>; })}</div>
-          <div className="relative h-[250px]"><TemperatureLine color="#aaa" points={highPoints} /><TemperatureLine color="#aaa" points={lowPoints} />{dashboard.forecast.map((item, index) => <div className="absolute top-0 flex h-[230px] w-[52px] -translate-x-1/2 flex-col justify-between text-center text-[10px] font-semibold" key={`temperature-${item.date}`} style={{ left: highPoints[index].x }}><span className="relative top-[15px] text-[16px] leading-none">{item.high}°</span><span className="relative top-[18px] text-[16px] leading-none text-[#555]">{item.low}°</span></div>)}</div>
-          <div className="grid h-[55px] grid-cols-7">{dashboard.forecast.map((item) => <div className="portrait-forecast-wind flex translate-y-[5px] flex-col items-center justify-center" key={`wind-${item.date}`}><span>{item.wind}</span><span>{item.level} Level</span></div>)}</div>
+          <div className="mt-1 grid h-[140px] grid-cols-7">{dashboard.forecast.map((item) => { const Icon = weatherIcons[item.kind]; return <article className="flex min-w-0 flex-col items-center justify-between pb-1 text-center" key={item.date}><p className="portrait-forecast-date translate-y-1 text-[#555]">{item.date}</p><h3 className="portrait-forecast-day translate-y-1.5">{item.day}</h3><Icon className="translate-y-1.5" color="#555" size={32} weight="light" aria-hidden="true" /><p className="portrait-forecast-condition w-full translate-y-1 px-0.5"><span>{item.condition}</span></p></article>; })}</div>
+          <div className="relative h-[238px]"><TemperatureLine color="#aaa" points={highPoints} /><TemperatureLine color="#aaa" points={lowPoints} />{dashboard.forecast.map((item, index) => <div className="absolute top-0 flex h-[218px] w-[52px] -translate-x-1/2 flex-col justify-between text-center text-[10px] font-semibold" key={`temperature-${item.date}`} style={{ left: highPoints[index].x }}><span className="relative top-3 text-[16px] leading-none">{item.high}°</span><span className="relative top-3 text-[16px] leading-none text-[#555]">{item.low}°</span></div>)}</div>
+          <div className="grid h-[55px] grid-cols-7">{dashboard.forecast.map((item) => <div className="portrait-forecast-wind flex items-center justify-center" key={`wind-${item.date}`}><span>{item.wind} {item.level}</span></div>)}</div>
         </section>
       </section>
     </main>
