@@ -197,7 +197,7 @@ async function landscapeSvg() {
   const loaded = await loadLandscapeDashboard();
   const data = loaded.data;
   let body = '<defs><pattern id="forecast-selected-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#aaaaaa" stroke-width="1"/></pattern></defs>' + rect(1, 1, 798, 478, 0, BLACK, WHITE, 2);
-  body += text(35, 39, data.city, 20, 700, { spacing: 0.2 });
+  body += text(35, 39, data.city, 24, 700, { spacing: 0.2 });
   body += text(765, 38, data.dateLabel, 20, 700, { anchor: 'end', fill: DARK });
   body += rect(15, 55, 770, 99, 16, DARK, WHITE, 2);
   body += weatherIcon(data.current.kind, 31, 72, 64, BLACK);

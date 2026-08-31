@@ -165,7 +165,7 @@ export async function loadPortraitDashboard(): Promise<MonitoredData<PortraitDas
       city: DISPLAY_CITY,
       dateLabel: `${currentDate.mmdd} ${currentDate.weekday.toUpperCase()}`,
       day: { temp: hourlySource.actual.temperature ?? fallbackPortrait.day.temp, kind: dayWeather.kind, condition: dayWeather.label, wind: hourlySource.actual.windspeed ?? fallbackPortrait.day.wind, gustLevel: hourlySource.actual.windgustlevel ?? fallbackPortrait.day.gustLevel, feels: hourlySource.actual.realfeel ?? fallbackPortrait.day.feels, visibility: hourlySource.actual.visibility ?? fallbackPortrait.day.visibility, uv: uvLabel(hourlySource.actual.uvindex), cloud: hourlySource.actual.cloudCover ?? fallbackPortrait.day.cloud },
-      night: { temp: current.mintemp ?? fallbackPortrait.night.temp, kind: nightWeather.kind, condition: nightWeather.label, wind: current.conditionNight?.windspeed ?? fallbackPortrait.night.wind, gustLevel: current.conditionNight?.windGustPow ?? fallbackPortrait.night.gustLevel },
+      night: { temp: current.mintemp ?? fallbackPortrait.night.temp, kind: nightWeather.kind, condition: nightWeather.label.replace(/\s+night$/i, ''), wind: current.conditionNight?.windspeed ?? fallbackPortrait.night.wind, gustLevel: current.conditionNight?.windGustPow ?? fallbackPortrait.night.gustLevel },
       distanceUnit: source.disUnit ?? fallbackPortrait.distanceUnit,
       windUnit: source.windSpeedUnit ?? fallbackPortrait.windUnit,
       hourly,
