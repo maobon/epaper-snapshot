@@ -197,25 +197,25 @@ async function landscapeSvg() {
   const loaded = await loadLandscapeDashboard();
   const data = loaded.data;
   let body = '<defs><pattern id="forecast-selected-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#aaaaaa" stroke-width="1"/></pattern></defs>' + rect(1, 1, 798, 478, 0, BLACK, WHITE, 2);
-  body += text(35, 39, data.city, 24, 700, { spacing: 0.2 });
-  body += text(765, 38, data.dateLabel, 20, 700, { anchor: 'end', fill: DARK });
-  body += rect(15, 55, 770, 99, 16, DARK, WHITE, 2);
-  body += weatherIcon(data.current.kind, 31, 72, 64, BLACK);
-  body += text(114, 127, data.current.temp, 60, 700) + text(187, 100, '°C', 22, 700);
-  body += text(322, 104.5, data.current.condition, 30, 700, { anchor: 'middle', baseline: 'middle' });
+  body += text(35, 35, data.city, 24, 700, { spacing: 0.2 });
+  body += text(765, 34, data.dateLabel, 20, 700, { anchor: 'end', fill: DARK });
+  body += rect(15, 47, 770, 99, 16, DARK, WHITE, 2);
+  body += weatherIcon(data.current.kind, 31, 64, 64, BLACK);
+  body += text(114, 119, data.current.temp, 60, 700) + text(187, 92, '°C', 22, 700);
+  body += text(322, 96.5, data.current.condition, 30, 700, { anchor: 'middle', baseline: 'middle' });
   const metrics = [['RAIN', `${data.current.rain}%`], ['HUMIDITY', `${data.current.humidity}%`], ['WIND', `${data.current.wind} km/h`]];
   metrics.forEach(([label, value], index) => {
     const x = 427 + index * 113;
-    body += rect(x, 71, 114, 66, index === 0 ? 12 : index === 2 ? 12 : 0, DARK, WHITE, 1);
-    body += text(x + 57, 98, label, 18, 700, { anchor: 'middle', fill: DARK, spacing: 0.35 }) + text(x + 57, 126, value, 24, 700, { anchor: 'middle' });
+    body += rect(x, 63, 114, 66, index === 0 ? 12 : index === 2 ? 12 : 0, DARK, WHITE, 1);
+    body += text(x + 57, 90, label, 18, 700, { anchor: 'middle', fill: DARK, spacing: 0.35 }) + text(x + 57, 118, value, 24, 700, { anchor: 'middle' });
   });
-  body += rect(15, 163, 770, 153, 16, DARK, WHITE, 2) + text(29, 188, 'Next 24 hours', 14, 700);
+  body += rect(15, 155, 770, 161, 16, DARK, WHITE, 2) + text(29, 180, '24 hours', 14, 700);
   const temperatures = data.hourly.map((hour) => hour.temp), min = Math.min(...temperatures), max = Math.max(...temperatures), span = Math.max(1, max - min);
   const hourlyLabelIndices = Array.from({ length: 8 }, (_, position) => Math.round(position * (data.hourly.length - 1) / 7));
   const hourlyPeriods = hourlyLabelIndices.map((index) => data.hourly[index]);
-  const hourlyPoints = hourlyPeriods.map((hour, position) => ({ x: 28 + position * 746 / Math.max(1, hourlyPeriods.length - 1), y: 270 - (hour.temp - min) / span * 56 }));
+  const hourlyPoints = hourlyPeriods.map((hour, position) => ({ x: 28 + position * 746 / Math.max(1, hourlyPeriods.length - 1), y: 270 - (hour.temp - min) / span * 64 }));
   body += line(28, 278, 774, 278, LIGHT, 1) + `<path d="${hourlyPoints.map((p, i) => `${i ? 'L' : 'M'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="${BLACK}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
-  hourlyPeriods.forEach((hour, position) => { const point = hourlyPoints[position], isHighest = hour.temp === max, anchor = position === 0 ? 'start' : position === hourlyPeriods.length - 1 ? 'end' : 'middle'; body += text(point.x, Math.max(isHighest ? 199 : 205, point.y - (isHighest ? 14 : 8)), `${hour.temp}°`, 11, 700, { anchor, fill: BLACK }); body += text(point.x, 297, hour.time, 11, 700, { anchor, fill: DARK }); });
+  hourlyPeriods.forEach((hour, position) => { const point = hourlyPoints[position], isHighest = hour.temp === max, anchor = position === 0 ? 'start' : position === hourlyPeriods.length - 1 ? 'end' : 'middle'; body += text(point.x, Math.max(isHighest ? 191 : 197, point.y - (isHighest ? 14 : 8)) - 5, `${hour.temp}°`, 14, 700, { anchor, fill: BLACK }); body += text(point.x, 297, hour.time, 11, 700, { anchor, fill: DARK }); });
   data.forecast.forEach((day, index) => {
     const x = 15 + index * 97;
     const selected = index === 0;
@@ -223,7 +223,7 @@ async function landscapeSvg() {
     body += text(x + 46, 352, day.day, 20, 700, { anchor: 'middle' });
     body += weatherIcon(day.kind, x + 24, 369, 44, BLACK);
     body += text(x + 43, 452, `${day.high}°`, 18, 700, { anchor: 'end' });
-    body += text(x + 52, 452, `${day.low}°`, 18, 400, { fill: DARK });
+    body += text(x + 52, 452, `${day.low}°`, 18, 400, { fill: BLACK });
   });
   return { svg: svgDocument(800, 480, body), manifest: createRenderManifest('landscape', loaded.source, data) };
 }

@@ -56,7 +56,7 @@ function makeChartPoints(hourly: LandscapeDashboard['hourly'], scaleHourly = hou
   const span = Math.max(1, max - min);
   return hourly.map((item, index) => ({
     x: (index * 746) / Math.max(1, hourly.length - 1),
-    y: 68 - ((item.temp - min) / span) * 52,
+    y: 76 - ((item.temp - min) / span) * 60,
   }));
 }
 
@@ -78,7 +78,7 @@ export default async function LandscapeWeather() {
     <main className="screen-stage grid min-h-screen min-w-[800px] place-items-center bg-white font-sans text-black">
       <script id="render-monitor-manifest" type="application/json" dangerouslySetInnerHTML={{ __html: serializeRenderManifest(manifest) }} />
       <section className="epaper-landscape h-[480px] w-[800px] overflow-hidden rounded-none border-2 border-black bg-white p-3" aria-label={`${dashboard.city} weather dashboard`}>
-        <header className="flex h-8 items-center justify-between px-5">
+        <header className="flex h-6 items-center justify-between px-5">
           <div className="landscape-city">
             {dashboard.city}
           </div>
@@ -103,11 +103,11 @@ export default async function LandscapeWeather() {
           </dl>
         </section>
 
-        <section className="mt-2 h-[154px] rounded-2xl border border-[#555] bg-white px-3 py-2" aria-label="Hourly temperature forecast">
+        <section className="mt-2 h-[162px] rounded-2xl border border-[#555] bg-white px-3 py-2" aria-label="Hourly temperature forecast">
           <div className="flex h-6 items-center">
-            <h2 className="text-sm font-semibold tracking-tight">Next 24 hours</h2>
+            <h2 className="text-sm font-semibold tracking-tight">24 hours</h2>
           </div>
-          <div className="relative h-[82px] w-[746px] overflow-visible border-b border-[#aaa]">
+          <div className="relative h-[90px] w-[746px] overflow-visible border-b border-[#aaa]">
             <div className="chart-area" style={{ clipPath: `polygon(${areaPoints})` }} />
             {chartPoints.slice(0, -1).map((point, index) => {
               const next = chartPoints[index + 1];
@@ -119,7 +119,7 @@ export default async function LandscapeWeather() {
               const point = chartPoints[position];
               const isHighest = item.temp === highestTemperature;
               const transform = position === 0 ? undefined : position === hourlyPeriods.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)';
-              return <b className="absolute z-[3] rounded-sm bg-white px-1 py-0.5 text-[11px] font-semibold text-black" key={`${item.time}-${position}`} style={{ left: point.x, top: Math.max(isHighest ? -6 : 0, point.y - (isHighest ? 30 : 24)), transform }}>{item.temp}°</b>;
+              return <b className="absolute z-[3] rounded-sm bg-white px-1 py-0.5 text-[14px] font-semibold text-black" key={`${item.time}-${position}`} style={{ left: point.x, top: Math.max(isHighest ? -6 : 0, point.y - (isHighest ? 30 : 24)) - 5, transform }}>{item.temp}°</b>;
             })}
           </div>
           <div className="relative h-6 w-[746px] text-xs font-medium text-[#555]">
@@ -136,7 +136,7 @@ export default async function LandscapeWeather() {
             <article className={`flex h-[142px] flex-col items-center rounded-xl border px-1 pt-2 ${item.selected ? 'forecast-selected border-black text-black' : 'border-[#aaa] bg-white text-black'}`} key={`${item.day}-${index}`} aria-label={`${item.day}, high ${item.high} degrees, low ${item.low} degrees`}>
               <h2 className="forecast-day-label">{item.day}</h2>
               <WeatherIcon kind={item.kind} />
-              <p className="mt-auto mb-2 grid w-full grid-cols-2 text-[18px] leading-none text-[#555]"><strong className="justify-self-end pr-[3px] font-semibold text-black">{item.high}°</strong><span className="justify-self-start pl-[6px]">{item.low}°</span></p>
+              <p className="mt-auto mb-2 grid w-full grid-cols-2 text-[18px] leading-none text-black"><strong className="justify-self-end pr-[3px] font-semibold">{item.high}°</strong><span className="justify-self-start pl-[6px]">{item.low}°</span></p>
             </article>
           ))}
         </section>
