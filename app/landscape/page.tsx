@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { CloudIcon } from '@phosphor-icons/react/dist/ssr/Cloud';
 import { CloudLightningIcon } from '@phosphor-icons/react/dist/ssr/CloudLightning';
 import { CloudMoonIcon } from '@phosphor-icons/react/dist/ssr/CloudMoon';
@@ -8,22 +9,23 @@ import { CloudSunIcon } from '@phosphor-icons/react/dist/ssr/CloudSun';
 import { MoonStarsIcon } from '@phosphor-icons/react/dist/ssr/MoonStars';
 import { SunIcon } from '@phosphor-icons/react/dist/ssr/Sun';
 import { createRenderManifest, serializeRenderManifest } from '@/lib/render-monitor';
+import { findWeatherCity } from '@/lib/weather-city';
 import { loadLandscapeDashboard, type LandscapeDashboard } from '@/lib/weather-dashboard';
 import type { WeatherDisplayKind } from '@/lib/weather-presentation';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Beijing Weather',
+  title: 'Weather · Landscape',
   description: 'A live 800 by 480 pixel four-level grayscale weather dashboard for e-paper displays.',
   openGraph: {
-    title: 'Beijing Weather',
+    title: 'Weather · Landscape',
     description: 'Live 800 × 480 weather dashboard for e-paper displays.',
     images: [],
   },
   twitter: {
     card: 'summary',
-    title: 'Beijing Weather',
+    title: 'Weather · Landscape',
     description: 'Live 800 × 480 weather dashboard for e-paper displays.',
     images: [],
   },
@@ -60,8 +62,11 @@ function makeChartPoints(hourly: LandscapeDashboard['hourly'], scaleHourly = hou
   }));
 }
 
-export default async function LandscapeWeather() {
-  const loaded = await loadLandscapeDashboard();
+export default async function LandscapeWeather({ searchParams }: { searchParams: Promise<{ city?: string | string[] }> }) {
+  const cityKey = (await searchParams).city;
+  const city = findWeatherCity(Array.isArray(cityKey) ? cityKey[0] : cityKey);
+  if (!city) notFound();
+  const loaded = await loadLandscapeDashboard(city);
   const dashboard = loaded.data;
   const manifest = createRenderManifest('landscape', loaded.source, dashboard);
   const CurrentIcon = weatherIcons[dashboard.current.kind];

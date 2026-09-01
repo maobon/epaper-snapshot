@@ -1,7 +1,6 @@
 import { fetchDailyWeather, fetchDaysWeather, fetchHourlyWeather } from '@/lib/weather-api';
+import { getDefaultWeatherCity, type WeatherCity } from '@/lib/weather-city';
 import { getWeatherPresentation, type WeatherDisplayKind, type WeatherKind } from '@/lib/weather-presentation';
-
-const DISPLAY_CITY = 'Beijing';
 
 export type MonitoredData<T> = {
   data: T;
@@ -21,8 +20,8 @@ export type LandscapeDashboard = {
   forecast: Array<{ day: string; high: number; low: number; kind: WeatherDisplayKind; selected?: boolean }>;
 };
 
-const fallbackLandscape: LandscapeDashboard = {
-  city: DISPLAY_CITY,
+const fallbackLandscapeBase: LandscapeDashboard = {
+  city: 'Beijing',
   dateLabel: 'TUE · 22:25',
   current: { temp: 22, kind: 'partly-small', condition: 'Partly cloudy', rain: 9, humidity: 92, wind: 10 },
   hourly: [22, 25, 25, 25, 24, 24, 22, 22, 23, 24, 24, 25, 26, 26, 27, 27, 27, 27, 26, 25, 25, 25, 24, 24].map(
@@ -33,6 +32,10 @@ const fallbackLandscape: LandscapeDashboard = {
     ['Sat', 29, 19, 'sunny'], ['Sun', 31, 19, 'sunny'], ['Mon', 29, 20, 'sunny'], ['Tue', 29, 19, 'sunny'],
   ].map(([day, high, low, kind], index) => ({ day: String(day), high: Number(high), low: Number(low), kind: kind as WeatherKind, selected: index === 0 })),
 };
+
+function fallbackLandscape(city: WeatherCity): LandscapeDashboard {
+  return { ...fallbackLandscapeBase, city: city.name };
+}
 
 function formatCurrentTime(value: string) {
   const [date = '2026-08-25', time = '22:25:00'] = value.split(' ');
@@ -46,13 +49,14 @@ function formatWeekday(value?: string) {
   return new Date(`${value}T12:00:00+08:00`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'Asia/Shanghai' });
 }
 
-export async function loadLandscapeDashboard(): Promise<MonitoredData<LandscapeDashboard>> {
+export async function loadLandscapeDashboard(city = getDefaultWeatherCity()): Promise<MonitoredData<LandscapeDashboard>> {
   type Hour = { temp?: number; rainprobability?: number; humidity?: number; ws?: number; time?: string; showHour?: string; icon?: string; weaType?: string; isdaynight?: boolean };
   type Day = { publicDate?: string; maxtemp?: number; mintemp?: number; dayWeaName?: string; dayWeaIcon?: string; conditionDay?: { weaIcon?: string } };
   type Source = { currentTime?: string; cityInfo?: { localizedName?: string; englishName?: string; name?: string }; actual?: { temperature?: number; humidity?: number; windspeed?: number; weaName?: string; weaIcon?: string }; hourly?: Hour[]; days?: { dailyWeathers?: Day[] } };
 
   try {
-    const source = await fetchHourlyWeather<Source>();
+    const fallback = fallbackLandscape(city);
+    const source = await fetchHourlyWeather<Source>(city);
     if (!source.actual || !source.currentTime) throw new Error('Hourly weather source omitted current conditions');
     const sourceHourly = source.hourly ?? [];
     const currentHour = sourceHourly[0];
@@ -73,22 +77,22 @@ export async function loadLandscapeDashboard(): Promise<MonitoredData<LandscapeD
     }));
     if (hourly.length !== 24 || forecast.length !== 8) throw new Error('Hourly weather source returned an incomplete forecast');
     return { source: 'live', data: {
-      city: DISPLAY_CITY,
+      city: city.name,
       dateLabel: formatCurrentTime(source.currentTime),
       current: {
-        temp: source.actual.temperature ?? fallbackLandscape.current.temp,
+        temp: source.actual.temperature ?? fallback.current.temp,
         kind: currentWeather.kind,
         condition: currentWeather.label,
-        rain: currentHour?.rainprobability ?? fallbackLandscape.current.rain,
-        humidity: source.actual.humidity ?? currentHour?.humidity ?? fallbackLandscape.current.humidity,
-        wind: source.actual.windspeed ?? currentHour?.ws ?? fallbackLandscape.current.wind,
+        rain: currentHour?.rainprobability ?? fallback.current.rain,
+        humidity: source.actual.humidity ?? currentHour?.humidity ?? fallback.current.humidity,
+        wind: source.actual.windspeed ?? currentHour?.ws ?? fallback.current.wind,
       },
       hourly,
       forecast,
     } };
   } catch (error) {
     console.error('Unable to load landscape weather data:', error);
-    return { source: 'fallback', data: fallbackLandscape, error: failureMessage(error) };
+    return { source: 'fallback', data: fallbackLandscape(city), error: failureMessage(error) };
   }
 }
 
@@ -109,13 +113,17 @@ const fallbackPortraitForecast: PortraitForecastDay[] = [
   ['08/27', 'Thu', 'Cloudy', 29, 21, 'N', 1, 'cloudy'], ['08/28', 'Fri', 'Light rain', 24, 19, 'NW', 1, 'rain'], ['08/29', 'Sat', 'Sunny', 29, 19, 'SW', 2, 'sunny'], ['08/30', 'Sun', 'Sunny', 31, 19, 'NW', 2, 'sunny'],
 ].map(([date, day, condition, high, low, wind, level, kind]) => ({ date: String(date), day: String(day), condition: String(condition), high: Number(high), low: Number(low), wind: String(wind), level: Number(level), kind: kind as WeatherKind }));
 
-export const fallbackPortrait: PortraitDashboard = {
-  city: DISPLAY_CITY, dateLabel: '08/25 TUE', distanceUnit: 'km', windUnit: 'km/h',
+const fallbackPortraitBase: PortraitDashboard = {
+  city: 'Beijing', dateLabel: '08/25 TUE', distanceUnit: 'km', windUnit: 'km/h',
   day: { temp: 30, kind: 'rain', condition: 'Moderate rain', wind: 10, gustLevel: 3, aqi: 33, visibility: 6, uv: 'Moderate', cloud: 95 },
   night: { temp: 21, kind: 'storm', condition: 'Thunderstorms', wind: 10, gustLevel: 3 },
   life: { dressing: 'Short sleeve', carWash: 'Not suitable', sports: 'Not suitable', colds: 'Easier' },
   forecast: fallbackPortraitForecast,
 };
+
+function fallbackPortrait(city: WeatherCity): PortraitDashboard {
+  return { ...fallbackPortraitBase, city: city.name };
+}
 
 function uvLabel(value = 0) { return value <= 2 ? 'Low' : value <= 5 ? 'Moderate' : value <= 7 ? 'High' : value <= 10 ? 'Very high' : 'Extreme'; }
 function translateLife(code: string, value?: string) {
@@ -134,13 +142,14 @@ function formatPortraitDate(date: string, relative?: 'today' | 'yesterday') {
   return { mmdd, weekday, day: relative === 'today' ? 'Today' : relative === 'yesterday' ? 'Yesterday' : weekday };
 }
 
-export async function loadPortraitDashboard(): Promise<MonitoredData<PortraitDashboard>> {
+export async function loadPortraitDashboard(city = getDefaultWeatherCity()): Promise<MonitoredData<PortraitDashboard>> {
   type Condition = { winddir?: string; windGustPow?: number; windlevel?: number; windspeed?: number; weaIcon?: string };
   type Day = { publicDate: string; maxtemp?: number; mintemp?: number; dayWeaName?: string; nightWeaName?: string; conditionDay?: Condition; conditionNight?: Condition };
   type DailySource = { cityInfo?: { localizedName?: string; englishName?: string; name?: string }; currentTime?: string; disUnit?: string; windSpeedUnit?: string; forecastList?: { dailyWeathers?: Day[] }; lifeIndex?: Array<{ code?: string; levelList?: Array<{ day?: string; level?: string }> }> };
   type HourlySource = { actual?: { temperature?: number; aqi?: number; visibility?: number; cloudCover?: number; uvindex?: number; windspeed?: number; windgustlevel?: number; weaName?: string; weaIcon?: string }; hourly?: Array<{ aqi?: number; isdaynight?: boolean }> };
   try {
-    const [source, hourlySource] = await Promise.all([fetchDailyWeather<DailySource>(), fetchHourlyWeather<HourlySource>()]);
+    const fallback = fallbackPortrait(city);
+    const [source, hourlySource] = await Promise.all([fetchDailyWeather<DailySource>(city), fetchHourlyWeather<HourlySource>(city)]);
     if (!source.currentTime || !hourlySource.actual) throw new Error('Weather source omitted current portrait conditions');
     const days = source.forecastList?.dailyWeathers ?? [];
     const currentIndex = days.findIndex((item) => item.publicDate === source.currentTime);
@@ -158,18 +167,18 @@ export async function loadPortraitDashboard(): Promise<MonitoredData<PortraitDas
     if (forecast.length !== 7) throw new Error('Weather source returned an incomplete portrait forecast');
     const lifeValue = (code: string) => source.lifeIndex?.find((item) => item.code === code)?.levelList?.find((item) => item.day === source.currentTime)?.level;
     return { source: 'live', data: {
-      city: DISPLAY_CITY,
+      city: city.name,
       dateLabel: `${currentDate.mmdd} ${currentDate.weekday.toUpperCase()}`,
-      day: { temp: hourlySource.actual.temperature ?? fallbackPortrait.day.temp, kind: dayWeather.kind, condition: dayWeather.label, wind: hourlySource.actual.windspeed ?? fallbackPortrait.day.wind, gustLevel: hourlySource.actual.windgustlevel ?? fallbackPortrait.day.gustLevel, aqi: hourlySource.actual.aqi ?? currentHour?.aqi ?? fallbackPortrait.day.aqi, visibility: hourlySource.actual.visibility ?? fallbackPortrait.day.visibility, uv: uvLabel(hourlySource.actual.uvindex), cloud: hourlySource.actual.cloudCover ?? fallbackPortrait.day.cloud },
-      night: { temp: current.mintemp ?? fallbackPortrait.night.temp, kind: nightWeather.kind, condition: nightWeather.label.replace(/\s+night$/i, ''), wind: current.conditionNight?.windspeed ?? fallbackPortrait.night.wind, gustLevel: current.conditionNight?.windGustPow ?? fallbackPortrait.night.gustLevel },
-      distanceUnit: source.disUnit ?? fallbackPortrait.distanceUnit,
-      windUnit: source.windSpeedUnit ?? fallbackPortrait.windUnit,
+      day: { temp: hourlySource.actual.temperature ?? fallback.day.temp, kind: dayWeather.kind, condition: dayWeather.label, wind: hourlySource.actual.windspeed ?? fallback.day.wind, gustLevel: hourlySource.actual.windgustlevel ?? fallback.day.gustLevel, aqi: hourlySource.actual.aqi ?? currentHour?.aqi ?? fallback.day.aqi, visibility: hourlySource.actual.visibility ?? fallback.day.visibility, uv: uvLabel(hourlySource.actual.uvindex), cloud: hourlySource.actual.cloudCover ?? fallback.day.cloud },
+      night: { temp: current.mintemp ?? fallback.night.temp, kind: nightWeather.kind, condition: nightWeather.label.replace(/\s+night$/i, ''), wind: current.conditionNight?.windspeed ?? fallback.night.wind, gustLevel: current.conditionNight?.windGustPow ?? fallback.night.gustLevel },
+      distanceUnit: source.disUnit ?? fallback.distanceUnit,
+      windUnit: source.windSpeedUnit ?? fallback.windUnit,
       life: { dressing: translateLife('2', lifeValue('2')), carWash: translateLife('4', lifeValue('4')), sports: translateLife('5', lifeValue('5')), colds: translateLife('3', lifeValue('3')) },
       forecast,
     } };
   } catch (error) {
     console.error('Unable to load portrait weather data:', error);
-    return { source: 'fallback', data: fallbackPortrait, error: failureMessage(error) };
+    return { source: 'fallback', data: fallbackPortrait(city), error: failureMessage(error) };
   }
 }
 
@@ -190,12 +199,12 @@ function forecast15Range(items: Forecast15Item[]) {
   return items.length ? `${label(items[0].date)} — ${label(items.at(-1)!.date)}` : '15 DAYS';
 }
 
-export async function loadForecast15Dashboard(): Promise<MonitoredData<Forecast15Dashboard>> {
+export async function loadForecast15Dashboard(city = getDefaultWeatherCity()): Promise<MonitoredData<Forecast15Dashboard>> {
   type Day = { publicDate: string; showDay?: string; maxtemp?: number; mintemp?: number; dayWeaName?: string; dayWeaIcon?: string; conditionDay?: { precProb?: number; rainProb?: number; winddir?: string; windspeed?: number } };
   type Source = { currentTime?: string; windSpeedUnit?: string; cityInfo?: { localizedName?: string; englishName?: string }; days?: { dailyWeathers?: Day[] } };
-  const fallback = { city: DISPLAY_CITY, forecast: fallback15, range: forecast15Range(fallback15), windSpeedUnit: 'km/h' };
+  const fallback = { city: city.name, forecast: fallback15, range: forecast15Range(fallback15), windSpeedUnit: 'km/h' };
   try {
-    const source = await fetchDaysWeather<Source>();
+    const source = await fetchDaysWeather<Source>(city);
     const future = (source.days?.dailyWeathers ?? []).filter((item) => item.publicDate >= (source.currentTime ?? '')).slice(0, 15);
     if (future.length !== 15) throw new Error('Weather source returned fewer than 15 future days');
     const forecast = future.map((item) => {
@@ -203,7 +212,7 @@ export async function loadForecast15Dashboard(): Promise<MonitoredData<Forecast1
       const condition = item.conditionDay ?? {};
       return { day: new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(new Date(`${item.publicDate}T00:00:00Z`)), date: item.showDay || item.publicDate.slice(5).replace('-', '/'), condition: presentation.label, kind: presentation.kind, high: Math.round(Number(item.maxtemp ?? 0)), low: Math.round(Number(item.mintemp ?? 0)), rain: Math.round(Number(condition.precProb ?? condition.rainProb ?? 0)), windDirection: condition.winddir || '—', windSpeed: Math.round(Number(condition.windspeed ?? 0)) };
     });
-    const data = { city: DISPLAY_CITY, forecast, range: forecast15Range(forecast), windSpeedUnit: source.windSpeedUnit ?? fallback.windSpeedUnit };
+    const data = { city: city.name, forecast, range: forecast15Range(forecast), windSpeedUnit: source.windSpeedUnit ?? fallback.windSpeedUnit };
     return { source: 'live', data };
   } catch (error) {
     console.error('Unable to load 15-day weather data:', error);

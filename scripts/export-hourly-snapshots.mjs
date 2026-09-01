@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { constants } from 'node:fs';
-import { access, appendFile, mkdir, mkdtemp, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { access, appendFile, mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,11 +32,11 @@ const CHROME_CANDIDATES = [...new Set([
   '/snap/bin/chromium',
   ...PATH_DIRS.flatMap((directory) => CHROME_NAMES.map((name) => join(directory, name))),
 ].filter(Boolean))];
-const PAGES = [
-  { name: 'currency', route: '/currency', width: 800, height: 480, marker: 'USD to CNH Chart' },
-  { name: 'landscape', route: '/landscape', width: 800, height: 480, marker: 'Beijing' },
-  { name: 'portrait', route: '/portrait', width: 480, height: 800, marker: '>AQI<' },
-  { name: 'forecast-15d', route: '/forecast-15d', width: 480, height: 800, marker: '15-DAY FORECAST' },
+const CURRENCY_PAGE = { name: 'currency', fileName: 'currency-frontend.png', view: 'currency', route: '/currency', width: 800, height: 480, marker: 'USD to CNH Chart' };
+const WEATHER_PAGES = [
+  { view: 'landscape', route: '/landscape', width: 800, height: 480 },
+  { view: 'portrait', route: '/portrait', width: 480, height: 800 },
+  { view: 'forecast-15d', route: '/forecast-15d', width: 480, height: 800 },
 ];
 const REQUIRE_LIVE_DATA = !['0', 'false', 'no'].includes((process.env.EPAPER_REQUIRE_LIVE_DATA || 'true').toLowerCase());
 
@@ -91,6 +91,44 @@ async function expectedAppIsReady() {
   } catch {
     return false;
   }
+}
+
+async function preloadWeatherCities() {
+  const responses = await Promise.all(WEATHER_PAGES.map(async ({ view }) => {
+    const response = await fetch(`${BASE_URL}/api/weather?view=${view}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`/api/weather?view=${view} returned ${response.status}`);
+    return response.json();
+  }));
+  const cities = responses[0]?.results?.map((result) => ({ key: result.key, name: result.data?.city }));
+  if (!Array.isArray(cities) || cities.length === 0 || cities.some((city) => !city.key || !city.name)) {
+    throw new Error('/api/weather returned no valid configured cities');
+  }
+  return cities;
+}
+
+function pagesForCities(cities) {
+  return [
+    CURRENCY_PAGE,
+    ...cities.flatMap((city) => {
+      const cityFileName = `${city.key.charAt(0).toUpperCase()}${city.key.slice(1)}`;
+      return WEATHER_PAGES.map((page) => ({
+        ...page,
+        city: city.key,
+        name: `${page.view}-${cityFileName}`,
+        fileName: `${page.view}-${cityFileName}.png`,
+        marker: page.view === 'landscape' ? city.name : page.view === 'portrait' ? '>AQI<' : '15-DAY FORECAST',
+      }));
+    }),
+  ];
+}
+
+async function removeLegacyWeatherSnapshots() {
+  const entries = await readdir(SNAPSHOT_DIR, { withFileTypes: true });
+  const legacyNames = entries
+    .filter((entry) => entry.isFile() && /^(?:.+-)?(?:landscape|portrait|forecast-15d)-frontend\.png$/.test(entry.name))
+    .map((entry) => entry.name);
+  await Promise.all(legacyNames.map((fileName) => rm(join(SNAPSHOT_DIR, fileName), { force: true })));
+  return legacyNames;
 }
 
 async function verifyPng(path, width, height) {
@@ -256,9 +294,12 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
 }
 
 async function exportPage(chromePath, page, refreshKey) {
-  const outputPath = join(SNAPSHOT_DIR, `${page.name}-frontend.png`);
-  const temporaryPath = join(SNAPSHOT_DIR, `.${page.name}-frontend-${process.pid}.png`);
-  const targetUrl = `${BASE_URL}${page.route}?snapshotHour=${refreshKey}`;
+  const outputPath = join(SNAPSHOT_DIR, page.fileName);
+  const temporaryPath = join(SNAPSHOT_DIR, `.${page.name}-${process.pid}.png`);
+  const targetUrlObject = new URL(page.route, BASE_URL);
+  targetUrlObject.searchParams.set('snapshotHour', refreshKey);
+  if (page.city) targetUrlObject.searchParams.set('city', page.city);
+  const targetUrl = targetUrlObject.toString();
   const response = await fetch(targetUrl, { cache: 'no-store' });
   if (!response.ok || !(await response.text()).includes(page.marker)) {
     throw new Error(`${page.route} did not return the expected front-end page`);
@@ -268,16 +309,19 @@ async function exportPage(chromePath, page, refreshKey) {
   try {
     const renderedHtml = await capturePage(chromePath, profileDir, temporaryPath, page, targetUrl);
     const pageManifest = parseRenderManifest(renderedHtml, page.route);
-    const imageResponse = await fetch(`${BASE_URL}/api/image/${page.name}.png?monitorHour=${refreshKey}`, { cache: 'no-store' });
-    if (!imageResponse.ok) throw new Error(`/api/image/${page.name}.png returned ${imageResponse.status}`);
+    const imageUrl = new URL(`/api/image/${page.view}.png`, BASE_URL);
+    imageUrl.searchParams.set('monitorHour', refreshKey);
+    if (page.city) imageUrl.searchParams.set('city', page.city);
+    const imageResponse = await fetch(imageUrl, { cache: 'no-store' });
+    if (!imageResponse.ok) throw new Error(`/api/image/${page.view}.png returned ${imageResponse.status}`);
     const imageBytes = Buffer.from(await imageResponse.arrayBuffer());
-    verifyPngBuffer(imageBytes, page.width, page.height, `/api/image/${page.name}.png`);
-    verifyFourGrayPixels(imageBytes, `/api/image/${page.name}.png`);
+    verifyPngBuffer(imageBytes, page.width, page.height, `/api/image/${page.view}.png`);
+    verifyFourGrayPixels(imageBytes, `/api/image/${page.view}.png`);
     const imageManifest = {
       source: imageResponse.headers.get('x-render-data-source'),
       fingerprint: imageResponse.headers.get('x-render-data-fingerprint'),
     };
-    if (pageManifest.view !== page.name) throw new Error(`${page.route} manifest identifies itself as ${pageManifest.view}`);
+    if (pageManifest.view !== page.view) throw new Error(`${page.route} manifest identifies itself as ${pageManifest.view}`);
     if (pageManifest.fingerprint !== imageManifest.fingerprint) {
       throw new Error(`${page.name} screenshot data ${pageManifest.fingerprint} differs from image API data ${imageManifest.fingerprint}`);
     }
@@ -288,10 +332,10 @@ async function exportPage(chromePath, page, refreshKey) {
       throw new Error(`${page.name} used fallback data instead of a live server response`);
     }
     if (imageResponse.headers.get('x-epaper-gray-levels') !== '0,85,170,255') {
-      throw new Error(`/api/image/${page.name}.png omitted the four-level grayscale declaration`);
+      throw new Error(`/api/image/${page.view}.png omitted the four-level grayscale declaration`);
     }
     await rename(temporaryPath, outputPath);
-    return { name: page.name, route: page.route, outputPath, source: pageManifest.source, fingerprint: pageManifest.fingerprint, width: page.width, height: page.height, status: 'passed' };
+    return { name: page.name, view: page.view, city: page.city, route: page.route, outputPath, source: pageManifest.source, fingerprint: pageManifest.fingerprint, width: page.width, height: page.height, status: 'passed' };
   } finally {
     await rm(temporaryPath, { force: true });
     await removeChromeProfile(profileDir);
@@ -339,8 +383,12 @@ async function main() {
     const refreshKey = hourKey();
     const checks = [];
     try {
-      for (const page of PAGES) checks.push(await exportPage(chromePath, page, refreshKey));
+      const cities = await preloadWeatherCities();
+      const pages = pagesForCities(cities);
+      for (const page of pages) checks.push(await exportPage(chromePath, page, refreshKey));
+      const removedLegacyFiles = await removeLegacyWeatherSnapshots();
       await writeReport({ status: 'passed', checkedAt: new Date().toISOString(), hour: refreshKey, baseUrl: BASE_URL, requireLiveData: REQUIRE_LIVE_DATA, checks });
+      if (removedLegacyFiles.length > 0) await logInfo(`Removed ${removedLegacyFiles.length} legacy weather snapshot files.`);
       await logInfo(`Exported and verified ${checks.length} front-end images for hour ${refreshKey}.`);
     } catch (error) {
       await writeReport({ status: 'failed', checkedAt: new Date().toISOString(), hour: refreshKey, baseUrl: BASE_URL, requireLiveData: REQUIRE_LIVE_DATA, checks, error: error instanceof Error ? error.message : String(error) });

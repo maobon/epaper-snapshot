@@ -5,7 +5,7 @@
 这里的职责分为两部分：
 
 - `pnpm start`：常驻运行 Next.js Web 服务，应交给 systemd、Supervisor 或 PM2 等进程管理器守护。
-- `pnpm snapshots:export`：由系统定时任务在每个整点调用，连接已经运行的 Web 服务，更新四张墨水屏截图，并校验截图数据与图片 API 使用的服务端响应一致。
+- `pnpm snapshots:export`：由系统定时任务在每个整点调用，连接已经运行的 Web 服务，更新汇率截图及所有已配置城市的三类天气截图，并校验截图数据与图片 API 使用的服务端响应一致。
 
 定时任务不会自行启动开发服务器。如果 Web 服务不可用，它会返回失败，便于监控发现部署问题。
 
@@ -13,7 +13,7 @@
 
 - 浏览器实际渲染页面与 `/api/image/*.png` 的数据指纹一致；
 - 天气与汇率数据来自实时服务端响应，而非本地回退数据；
-- 四张截图和四个图片接口的尺寸正确；
+- 所有截图和对应图片接口的尺寸正确；
 - 图片接口生成的每个像素都属于 `0 / 85 / 170 / 255` 四级灰阶。
 
 运行日志和结果统一写入根目录 `logs/`：
@@ -33,7 +33,15 @@ command -v google-chrome-stable google-chrome chromium chromium-browser
 
 根据第二条命令的输出调整 `.env` 中的 `EPAPER_CHROME_PATH`。如果没有任何输出，请先安装 Google Chrome 或 Chromium。
 
-低配云主机上可以适当延长单页 Chrome 截图等待时间（默认 120 秒，最小 10 秒）。以下配置允许每个页面最多等待 180 秒；四个页面仍然串行处理，不会同时启动多个 Chrome 实例：
+天气城市统一由 `WEATHER_CITIES` 配置。它是一个 JSON 数组，第一项是没有传 `city` 参数时使用的默认城市。例如：
+
+```dotenv
+WEATHER_CITIES='[{"key":"beijing","cityId":"0101010102","name":"Beijing"},{"key":"your-city","cityId":"替换为天气服务的城市ID","name":"Your City"}]'
+```
+
+配置多个城市后可通过页面查询参数分别查看，例如 `/landscape?city=beijing`、`/portrait?city=your-city`；图片接口同样支持 `/api/image/landscape.png?city=your-city`。`/api/weather?view=landscape` 会使用并发请求返回全部已配置城市，也可以用 `city=beijing,your-city` 指定子集。缓存键包含城市 ID，不同城市的数据不会互相覆盖。整点任务会先并发预取全部城市，再逐张截图；天气文件名将城市键放在最后并将首字母大写，例如 `landscape-Beijing.png`、`portrait-Guangzhou.png` 和 `forecast-15d-Shanghai.png`。旧的 `*-frontend.png` 天气文件会在完整导出成功后清理，汇率文件继续使用 `currency-frontend.png`。
+
+低配云主机上可以适当延长单页 Chrome 截图等待时间（默认 120 秒，最小 10 秒）。以下配置允许每个页面最多等待 180 秒；所有页面仍然串行截图，不会同时启动多个 Chrome 实例：
 
 ```dotenv
 EPAPER_CHROME_TIMEOUT_MS=180000
@@ -76,7 +84,7 @@ pnpm snapshots:export
 
 ```bash
 curl -I http://127.0.0.1:3001/currency
-ls -lh snapshot/*-frontend.png
+ls -lh snapshot/*.png
 tail -n 50 logs/hourly-export-error.log
 cat logs/monitor-report.json
 ```

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { CloudIcon } from '@phosphor-icons/react/dist/ssr/Cloud';
 import { CloudLightningIcon } from '@phosphor-icons/react/dist/ssr/CloudLightning';
 import { CloudRainIcon } from '@phosphor-icons/react/dist/ssr/CloudRain';
@@ -7,19 +8,20 @@ import { CloudSunIcon } from '@phosphor-icons/react/dist/ssr/CloudSun';
 import { DropIcon } from '@phosphor-icons/react/dist/ssr/Drop';
 import { SunIcon } from '@phosphor-icons/react/dist/ssr/Sun';
 import { createRenderManifest, serializeRenderManifest } from '@/lib/render-monitor';
+import { findWeatherCity } from '@/lib/weather-city';
 import { loadForecast15Dashboard } from '@/lib/weather-dashboard';
 
 export const metadata: Metadata = {
-  title: 'Beijing · 15-Day Forecast',
+  title: 'Weather · 15-Day Forecast',
   description: 'A live 480 by 800 pixel, four-level grayscale 15-day weather forecast for portrait e-paper displays.',
   openGraph: {
-    title: 'Beijing · 15-Day Forecast',
+    title: 'Weather · 15-Day Forecast',
     description: 'Live 15-day weather data in a 480 × 800 four-level grayscale e-paper layout.',
     images: [],
   },
   twitter: {
     card: 'summary',
-    title: 'Beijing · 15-Day Forecast',
+    title: 'Weather · 15-Day Forecast',
     description: 'Live 15-day weather data in a 480 × 800 four-level grayscale e-paper layout.',
     images: [],
   },
@@ -36,8 +38,11 @@ const weatherIcons = {
   sunny: SunIcon,
 };
 
-export default async function FifteenDayForecast() {
-  const loaded = await loadForecast15Dashboard();
+export default async function FifteenDayForecast({ searchParams }: { searchParams: Promise<{ city?: string | string[] }> }) {
+  const cityKey = (await searchParams).city;
+  const configuredCity = findWeatherCity(Array.isArray(cityKey) ? cityKey[0] : cityKey);
+  if (!configuredCity) notFound();
+  const loaded = await loadForecast15Dashboard(configuredCity);
   const { city, forecast, range, windSpeedUnit } = loaded.data;
   const manifest = createRenderManifest('forecast-15d', loaded.source, loaded.data);
 

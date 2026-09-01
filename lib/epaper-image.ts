@@ -4,6 +4,7 @@ import { BitDepth, ColorType, decode, encode } from '@cf-wasm/png/node';
 import { Resvg } from '@cf-wasm/resvg/node';
 import { fetchMonthlyUsdCnh, type ExchangeRatePoint } from '@/lib/exchange-rate-api';
 import { createRenderManifest, type RenderManifest } from '@/lib/render-monitor';
+import type { WeatherCity } from '@/lib/weather-city';
 import { loadForecast15Dashboard, loadLandscapeDashboard, loadPortraitDashboard } from '@/lib/weather-dashboard';
 import type { WeatherDisplayKind } from '@/lib/weather-presentation';
 
@@ -193,8 +194,8 @@ async function currencySvg() {
   return { svg: svgDocument(800, 480, body), manifest: createRenderManifest('currency', source, points) };
 }
 
-async function landscapeSvg() {
-  const loaded = await loadLandscapeDashboard();
+async function landscapeSvg(city?: WeatherCity) {
+  const loaded = await loadLandscapeDashboard(city);
   const data = loaded.data;
   let body = '<defs><pattern id="forecast-selected-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#aaaaaa" stroke-width="1"/></pattern></defs>' + rect(1, 1, 798, 478, 0, BLACK, WHITE, 2);
   body += text(35, 35, data.city, 24, 700, { spacing: 0.2 });
@@ -232,18 +233,20 @@ function sectionTitle(y: number, title: string, note?: string) {
   return text(20, y, title, 14, 700, { spacing: 0.2 }) + (note ? text(460, y, note, 11, 700, { anchor: 'end', fill: DARK }) : '');
 }
 
-async function portraitSvg() {
-  const loaded = await loadPortraitDashboard();
+async function portraitSvg(city?: WeatherCity) {
+  const loaded = await loadPortraitDashboard(city);
   const data = loaded.data;
   let body = rect(1, 1, 478, 798, 0, BLACK, WHITE, 2);
   body += rect(10, 10, 460, 184, 14, DARK, WHITE, 2) + text(20, 34, 'CURRENT', 14, 700) + text(460, 34, `${data.city.toUpperCase()} · ${data.dateLabel}`, 11, 700, { anchor: 'end', fill: DARK });
-  body += text(20, 106, data.day.temp, 68, 700) + text(91, 65, '°', 26, 700) + weatherIcon(data.day.kind, 201, 47, 48, DARK) + text(225, 111, data.day.condition.toUpperCase(), 20, 700, { anchor: 'middle' });
+  const dayConditionLines = wrapTextLines(data.day.condition.toUpperCase(), 8);
+  body += text(20, 106, data.day.temp, 68, 700) + text(91, 65, '°', 26, 700) + weatherIcon(data.day.kind, 166, 69, 30, DARK);
+  body += dayConditionLines.map((condition, lineIndex) => text(202, dayConditionLines.length === 1 ? 84 : 75 + lineIndex * 20, condition, 20, 700, { baseline: 'middle' })).join('');
   body += text(350, 70, `Wind ${data.day.wind} ${data.windUnit}`, 17, 700) + text(350, 94, `Gust · Level ${data.day.gustLevel}`, 17, 700);
   body += line(20, 122, 460, 122, LIGHT, 1);
   const detail = [['AQI', `${data.day.aqi}`], ['VISIBILITY', `${data.day.visibility} ${data.distanceUnit}`], ['UV INDEX', data.day.uv], ['CLOUD', `${data.day.cloud}%`]];
   detail.forEach(([label, value], index) => { const x = 20 + index * 110; if (index) body += line(x, 130, x, 184, LIGHT, 1); body += text(x + 55, 154, label, 14, 700, { anchor: 'middle', fill: DARK, spacing: 0.2 }) + text(x + 55, 179, value, 20, 700, { anchor: 'middle' }); });
   body += rect(10, 201, 460, 96, 14, DARK, WHITE, 2) + sectionTitle(225, 'NIGHT', '18:00 — 06:00');
-  body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 142, 235, 38, DARK) + text(188, 265, data.night.condition.toUpperCase(), 18, 700) + text(350, 253, `Wind ${data.night.wind} ${data.windUnit}`, 17, 700) + text(350, 277, `Gust · Level ${data.night.gustLevel}`, 17, 700);
+  body += text(20, 280, data.night.temp, 55, 700) + text(77, 251, '°', 22, 700) + weatherIcon(data.night.kind, 177, 243, 28, DARK) + text(219, 257, data.night.condition.toUpperCase(), 18, 700, { baseline: 'middle' }) + text(350, 253, `Wind ${data.night.wind} ${data.windUnit}`, 17, 700) + text(350, 277, `Gust · Level ${data.night.gustLevel}`, 17, 700);
   body += rect(10, 304, 460, 486, 14, DARK, WHITE, 2) + sectionTitle(328, '7-DAY FORECAST');
   const forecastX = (index: number) => 20 + ((index + 0.5) * 440) / data.forecast.length;
   data.forecast.forEach((day, index) => {
@@ -259,8 +262,8 @@ async function portraitSvg() {
   return { svg: svgDocument(480, 800, body), manifest: createRenderManifest('portrait', loaded.source, data) };
 }
 
-async function forecast15Svg() {
-  const loaded = await loadForecast15Dashboard();
+async function forecast15Svg(configuredCity?: WeatherCity) {
+  const loaded = await loadForecast15Dashboard(configuredCity);
   const { city, forecast: items } = loaded.data;
   let body = rect(1, 1, 478, 798, 0, BLACK, WHITE, 2);
   body += text(18, 32, '15-DAY FORECAST', 18, 700) + text(18, 48, `${city.toUpperCase()} · ${items[0].date} — ${items.at(-1)?.date}`, 11, 700, { fill: DARK, spacing: 0.4 });
@@ -275,8 +278,8 @@ async function forecast15Svg() {
   return { svg: svgDocument(480, 800, body), manifest: createRenderManifest('forecast-15d', loaded.source, loaded.data) };
 }
 
-export async function generateEpaperImage(name: EpaperImageName) {
-  const rendered: { svg: string; manifest: RenderManifest } = name === 'currency' ? await currencySvg() : name === 'landscape' ? await landscapeSvg() : name === 'portrait' ? await portraitSvg() : await forecast15Svg();
+export async function generateEpaperImage(name: EpaperImageName, city?: WeatherCity) {
+  const rendered: { svg: string; manifest: RenderManifest } = name === 'currency' ? await currencySvg() : name === 'landscape' ? await landscapeSvg(city) : name === 'portrait' ? await portraitSvg(city) : await forecast15Svg(city);
   const { svg, manifest } = rendered;
   const png = await svgToFourGrayPng(svg);
   return { png, svg, manifest, ...EPAPER_IMAGE_SPECS[name] };
