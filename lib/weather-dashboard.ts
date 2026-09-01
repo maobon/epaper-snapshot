@@ -162,7 +162,10 @@ export async function loadPortraitDashboard(city = getDefaultWeatherCity()): Pro
     const forecast = days.slice(Math.max(0, currentIndex - 1), Math.max(0, currentIndex - 1) + 7).map((item, index) => {
       const presentation = getWeatherPresentation(item.dayWeaName, item.conditionDay?.weaIcon);
       const formatted = formatPortraitDate(item.publicDate, index === 0 ? 'yesterday' : index === 1 ? 'today' : undefined);
-      return { date: formatted.mmdd, day: formatted.day, condition: presentation.label === 'Moderate rain' ? 'Mod. rain' : presentation.label, high: item.maxtemp ?? 0, low: item.mintemp ?? 0, wind: item.conditionDay?.winddir ?? '—', level: item.conditionDay?.windlevel ?? 0, kind: presentation.kind };
+      const condition = presentation.label === 'Moderate rain'
+        ? 'Mod. rain'
+        : presentation.label === 'Thunderstorms' ? 'T-storms' : presentation.label;
+      return { date: formatted.mmdd, day: formatted.day, condition, high: item.maxtemp ?? 0, low: item.mintemp ?? 0, wind: item.conditionDay?.winddir ?? '—', level: item.conditionDay?.windlevel ?? 0, kind: presentation.kind };
     });
     if (forecast.length !== 7) throw new Error('Weather source returned an incomplete portrait forecast');
     const lifeValue = (code: string) => source.lifeIndex?.find((item) => item.code === code)?.levelList?.find((item) => item.day === source.currentTime)?.level;

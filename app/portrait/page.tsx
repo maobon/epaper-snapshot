@@ -23,6 +23,10 @@ export const metadata: Metadata = {
 
 const weatherIcons = { rain: CloudRainIcon, storm: CloudLightningIcon, snow: CloudSnowIcon, partly: CloudSunIcon, cloudy: CloudIcon, sunny: SunIcon, 'night-clear': MoonStarsIcon, 'partly-small': CloudMoonIcon };
 
+function conditionClassName(condition: string) {
+  return condition.trim().length > 10 && !/\s/.test(condition.trim()) ? 'portrait-condition-long-word' : '';
+}
+
 function seriesPoints(values: number[], top: number, bottom: number) {
   const min = Math.min(...values), max = Math.max(...values), span = Math.max(1, max - min);
   return values.map((value, index) => ({ x: ((index + 0.5) * 440) / values.length, y: bottom - ((value - min) / span) * (bottom - top) }));
@@ -49,7 +53,7 @@ export default async function PortraitWeather({ searchParams }: { searchParams: 
           <header className="flex h-5 items-center justify-between text-xs font-semibold"><h1 className="tracking-wide">CURRENT</h1><p className="text-[10px] text-[#555]">{dashboard.city} · {dashboard.dateLabel}</p></header>
           <div className="grid h-[82px] grid-cols-[120px_minmax(0,1fr)_150px] items-center gap-2">
             <div className="flex items-start"><strong className="text-[70px] leading-[.86] tracking-[-4px]">{dashboard.day.temp}</strong><span className="ml-1 text-[28px] leading-none">°</span></div>
-            <div className="flex w-full items-center justify-center gap-1"><DayIcon className="shrink-0" color="#555" size={30} weight="light" /><span className="portrait-day-condition">{dashboard.day.condition}</span></div>
+            <div className="flex w-full items-center justify-center gap-1"><DayIcon className="shrink-0" color="#555" size={30} weight="light" /><span className={`portrait-day-condition ${conditionClassName(dashboard.day.condition)}`}>{dashboard.day.condition}</span></div>
             <dl className="portrait-wind-details w-[126px] justify-self-end space-y-2"><div className="whitespace-nowrap"><dt className="sr-only">Wind</dt><dd><b>Wind</b> {dashboard.day.wind} {dashboard.windUnit}</dd></div><div className="whitespace-nowrap"><dt className="sr-only">Wind gust level</dt><dd><b>Gust</b> · Level {dashboard.day.gustLevel}</dd></div></dl>
           </div>
           <dl className="grid h-[64px] grid-cols-4 divide-x divide-[#aaa] border-t border-[#aaa] pt-1.5">
@@ -61,7 +65,7 @@ export default async function PortraitWeather({ searchParams }: { searchParams: 
         </section>
         <section className="h-[96px] shrink-0 rounded-2xl border border-[#555] bg-white p-2" aria-label="Night weather">
           <header className="flex h-5 items-center justify-between text-xs font-semibold"><h2 className="tracking-wide">NIGHT</h2><p className="text-[#555]">18:00 — 06:00</p></header>
-          <div className="grid h-[58px] grid-cols-[120px_minmax(0,1fr)_150px] items-center gap-2"><div className="flex items-start"><strong className="text-[56px] leading-none tracking-[-3px]">{dashboard.night.temp}</strong><span className="text-2xl leading-none">°</span></div><div className="flex w-full items-center justify-center gap-3"><NightIcon className="shrink-0" color="#555" size={28} weight="light" /><span className="portrait-night-condition">{dashboard.night.condition}</span></div><dl className="portrait-wind-details w-[126px] justify-self-end space-y-1.5"><div className="whitespace-nowrap"><dt className="sr-only">Wind</dt><dd><b>Wind</b> {dashboard.night.wind} {dashboard.windUnit}</dd></div><div className="whitespace-nowrap"><dt className="sr-only">Wind gust level</dt><dd><b>Gust</b> · Level {dashboard.night.gustLevel}</dd></div></dl></div>
+          <div className="grid h-[58px] grid-cols-[120px_minmax(0,1fr)_150px] items-center gap-2"><div className="flex items-start"><strong className="text-[56px] leading-none tracking-[-3px]">{dashboard.night.temp}</strong><span className="text-2xl leading-none">°</span></div><div className="flex w-full items-center justify-center gap-3"><NightIcon className="shrink-0" color="#555" size={28} weight="light" /><span className={`portrait-night-condition ${conditionClassName(dashboard.night.condition)}`}>{dashboard.night.condition}</span></div><dl className="portrait-wind-details w-[126px] justify-self-end space-y-1.5"><div className="whitespace-nowrap"><dt className="sr-only">Wind</dt><dd><b>Wind</b> {dashboard.night.wind} {dashboard.windUnit}</dd></div><div className="whitespace-nowrap"><dt className="sr-only">Wind gust level</dt><dd><b>Gust</b> · Level {dashboard.night.gustLevel}</dd></div></dl></div>
         </section>
         <section className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#555] bg-white p-2" aria-label="Seven day weather forecast">
           <header className="flex h-5 items-center"><h2 className="text-sm font-semibold">7-DAY FORECAST</h2></header>

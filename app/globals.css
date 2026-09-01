@@ -308,7 +308,8 @@ button { font: inherit; }
   font-size: 20px;
   line-height: 1.05;
   font-weight: 700;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
   text-transform: uppercase;
 }
 
@@ -319,8 +320,15 @@ button { font: inherit; }
   font-size: 18px;
   line-height: 1.05;
   font-weight: 700;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
   text-transform: uppercase;
+}
+
+.epaper-portrait .portrait-condition-long-word {
+  font-size: 15px;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
 }
 
 .epaper-portrait .portrait-wind-details {
@@ -444,7 +452,8 @@ button { font: inherit; }
 .epaper-portrait .portrait-forecast-condition > span {
   display: -webkit-box;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
   white-space: normal;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
