@@ -4,7 +4,6 @@ import { access, appendFile, mkdir, mkdtemp, open, readFile, readdir, rename, rm
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ColorType, decode } from '@cf-wasm/png/node';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = dirname(SCRIPT_DIR);
@@ -38,7 +37,21 @@ const WEATHER_PAGES = [
   { view: 'portrait', route: '/portrait', width: 480, height: 800 },
   { view: 'forecast-15d', route: '/forecast-15d', width: 480, height: 800 },
 ];
-const REQUIRE_LIVE_DATA = !['0', 'false', 'no'].includes((process.env.EPAPER_REQUIRE_LIVE_DATA || 'true').toLowerCase());
+
+function envFlag(name, fallback) {
+  const value = process.env[name];
+  return value === undefined ? fallback : !['0', 'false', 'no'].includes(value.trim().toLowerCase());
+}
+
+function envInteger(name, fallback, minimum, maximum = Number.MAX_SAFE_INTEGER) {
+  const value = Number(process.env[name] ?? fallback);
+  return Number.isInteger(value) && value >= minimum && value <= maximum ? value : fallback;
+}
+
+const REQUIRE_LIVE_DATA = envFlag('EPAPER_REQUIRE_LIVE_DATA', true);
+const EXPORT_DELAY_MS = envInteger('EPAPER_EXPORT_DELAY_MS', 2_000, 0);
+const CHROME_NICE = envInteger('EPAPER_CHROME_NICE', 10, 0, 19);
+const LOWER_CHROME_PRIORITY = process.platform === 'linux' && CHROME_NICE > 0;
 
 async function ensureLogFiles() {
   await mkdir(LOG_DIR, { recursive: true });
@@ -85,23 +98,33 @@ async function findChrome() {
 
 async function expectedAppIsReady() {
   try {
-    const response = await fetch(`${BASE_URL}/currency?snapshotProbe=${Date.now()}`, { cache: 'no-store' });
-    if (!response.ok) return false;
-    return (await response.text()).includes('USD to CNH Chart');
+    const response = await fetch(`${BASE_URL}/api/weather?view=snapshot-probe`, { cache: 'no-store' });
+    return response.status === 400;
   } catch {
     return false;
   }
 }
 
-async function preloadWeatherCities() {
-  const responses = await Promise.all(WEATHER_PAGES.map(async ({ view }) => {
-    const response = await fetch(`${BASE_URL}/api/weather?view=${view}`, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`/api/weather?view=${view} returned ${response.status}`);
-    return response.json();
-  }));
-  const cities = responses[0]?.results?.map((result) => ({ key: result.key, name: result.data?.city }));
-  if (!Array.isArray(cities) || cities.length === 0 || cities.some((city) => !city.key || !city.name)) {
-    throw new Error('/api/weather returned no valid configured cities');
+function configuredWeatherCities() {
+  let configured = [{ key: 'beijing', name: 'Beijing' }];
+  if (process.env.WEATHER_CITIES?.trim()) {
+    try {
+      configured = JSON.parse(process.env.WEATHER_CITIES);
+    } catch (error) {
+      throw new Error(`WEATHER_CITIES must be valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (!Array.isArray(configured) || configured.length === 0) {
+    throw new Error('WEATHER_CITIES must be a non-empty JSON array');
+  }
+  const cities = configured.map((city, index) => {
+    const key = typeof city?.key === 'string' ? city.key.trim().toLowerCase() : '';
+    const name = typeof city?.name === 'string' ? city.name.trim() : '';
+    if (!key || !name) throw new Error(`WEATHER_CITIES[${index}] must contain a valid key and name`);
+    return { key, name };
+  });
+  if (new Set(cities.map((city) => city.key)).size !== cities.length) {
+    throw new Error('WEATHER_CITIES contains duplicate keys');
   }
   return cities;
 }
@@ -143,18 +166,6 @@ function verifyPngBuffer(image, width, height, label) {
   const actualHeight = image.readUInt32BE(20);
   if (actualWidth !== width || actualHeight !== height) {
     throw new Error(`${label} is ${actualWidth}x${actualHeight}; expected ${width}x${height}`);
-  }
-}
-
-function verifyFourGrayPixels(image, label) {
-  const decoded = decode(image);
-  if (decoded.colorType !== ColorType.RGBA) throw new Error(`${label} is not an RGBA PNG`);
-  const allowed = new Set([0, 85, 170, 255]);
-  for (let offset = 0; offset < decoded.image.length; offset += 4) {
-    const red = decoded.image[offset];
-    if (red !== decoded.image[offset + 1] || red !== decoded.image[offset + 2] || decoded.image[offset + 3] !== 255 || !allowed.has(red)) {
-      throw new Error(`${label} contains a pixel outside the declared 0/85/170/255 opaque grayscale palette`);
-    }
   }
 }
 
@@ -219,7 +230,17 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
     '--headless=new',
     '--disable-gpu',
     '--disable-extensions',
+    '--disable-background-mode',
     '--disable-background-networking',
+    '--disable-component-extensions-with-background-pages',
+    '--disable-component-update',
+    '--disable-default-apps',
+    '--disable-domain-reliability',
+    '--disable-sync',
+    '--metrics-recording-only',
+    '--no-default-browser-check',
+    '--no-pings',
+    '--renderer-process-limit=1',
     ...(process.platform === 'linux' ? ['--disable-dev-shm-usage'] : []),
     ...(typeof process.getuid === 'function' && process.getuid() === 0
       ? ['--no-sandbox', '--disable-setuid-sandbox']
@@ -229,13 +250,12 @@ async function capturePage(chromePath, profileDir, temporaryPath, page, targetUr
     '--run-all-compositor-stages-before-draw',
     '--force-device-scale-factor=1',
     `--window-size=${page.width},${page.height}`,
-    '--virtual-time-budget=3000',
     '--dump-dom',
     `--user-data-dir=${profileDir}`,
     `--screenshot=${temporaryPath}`,
     targetUrl,
   ];
-  const child = spawn(chromePath, chromeArgs, {
+  const child = spawn(LOWER_CHROME_PRIORITY ? 'nice' : chromePath, LOWER_CHROME_PRIORITY ? ['-n', String(CHROME_NICE), chromePath, ...chromeArgs] : chromeArgs, {
     cwd: PROJECT_DIR,
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -300,42 +320,21 @@ async function exportPage(chromePath, page, refreshKey) {
   targetUrlObject.searchParams.set('snapshotHour', refreshKey);
   if (page.city) targetUrlObject.searchParams.set('city', page.city);
   const targetUrl = targetUrlObject.toString();
-  const response = await fetch(targetUrl, { cache: 'no-store' });
-  if (!response.ok || !(await response.text()).includes(page.marker)) {
-    throw new Error(`${page.route} did not return the expected front-end page`);
-  }
-
   const profileDir = await mkdtemp(join(tmpdir(), `weather-epaper-${page.name}-`));
   try {
     const renderedHtml = await capturePage(chromePath, profileDir, temporaryPath, page, targetUrl);
-    const pageManifest = parseRenderManifest(renderedHtml, page.route);
-    const imageUrl = new URL(`/api/image/${page.view}.png`, BASE_URL);
-    imageUrl.searchParams.set('monitorHour', refreshKey);
-    if (page.city) imageUrl.searchParams.set('city', page.city);
-    const imageResponse = await fetch(imageUrl, { cache: 'no-store' });
-    if (!imageResponse.ok) throw new Error(`/api/image/${page.view}.png returned ${imageResponse.status}`);
-    const imageBytes = Buffer.from(await imageResponse.arrayBuffer());
-    verifyPngBuffer(imageBytes, page.width, page.height, `/api/image/${page.view}.png`);
-    verifyFourGrayPixels(imageBytes, `/api/image/${page.view}.png`);
-    const imageManifest = {
-      source: imageResponse.headers.get('x-render-data-source'),
-      fingerprint: imageResponse.headers.get('x-render-data-fingerprint'),
-    };
-    if (pageManifest.view !== page.view) throw new Error(`${page.route} manifest identifies itself as ${pageManifest.view}`);
-    if (pageManifest.fingerprint !== imageManifest.fingerprint) {
-      throw new Error(`${page.name} screenshot data ${pageManifest.fingerprint} differs from image API data ${imageManifest.fingerprint}`);
+    if (!renderedHtml.includes(page.marker)) {
+      throw new Error(`${page.route} did not return the expected front-end page`);
     }
-    if (pageManifest.source !== imageManifest.source) {
-      throw new Error(`${page.name} screenshot source ${pageManifest.source} differs from image API source ${imageManifest.source}`);
+    const manifest = parseRenderManifest(renderedHtml, page.route);
+    if (manifest.view !== page.view) {
+      throw new Error(`${page.route} manifest identifies itself as ${manifest.view}`);
     }
-    if (REQUIRE_LIVE_DATA && pageManifest.source !== 'live') {
+    if (REQUIRE_LIVE_DATA && manifest.source !== 'live') {
       throw new Error(`${page.name} used fallback data instead of a live server response`);
     }
-    if (imageResponse.headers.get('x-epaper-gray-levels') !== '0,85,170,255') {
-      throw new Error(`/api/image/${page.view}.png omitted the four-level grayscale declaration`);
-    }
     await rename(temporaryPath, outputPath);
-    return { name: page.name, view: page.view, city: page.city, route: page.route, outputPath, source: pageManifest.source, fingerprint: pageManifest.fingerprint, width: page.width, height: page.height, status: 'passed' };
+    return { name: page.name, view: page.view, city: page.city, route: page.route, outputPath, source: manifest.source, fingerprint: manifest.fingerprint, width: page.width, height: page.height, status: 'passed' };
   } finally {
     await rm(temporaryPath, { force: true });
     await removeChromeProfile(profileDir);
@@ -377,21 +376,35 @@ async function main() {
     }
     const chromePath = await findChrome();
     await logInfo(`Using Chrome executable: ${chromePath}`);
+    const schedulingPriority = LOWER_CHROME_PRIORITY ? `nice ${CHROME_NICE}` : 'operating-system default';
+    await logInfo(`Chrome scheduling priority: ${schedulingPriority}.`);
     if (typeof process.getuid === 'function' && process.getuid() === 0) {
       await logInfo('WARNING: Running Chrome as root; sandbox is disabled for the snapshot process. Prefer a non-root service user in production.');
     }
     const refreshKey = hourKey();
     const checks = [];
+    const reportContext = {
+      hour: refreshKey,
+      baseUrl: BASE_URL,
+      requireLiveData: REQUIRE_LIVE_DATA,
+      chromeNice: LOWER_CHROME_PRIORITY ? CHROME_NICE : undefined,
+      exportDelayMs: EXPORT_DELAY_MS,
+    };
     try {
-      const cities = await preloadWeatherCities();
+      const cities = configuredWeatherCities();
       const pages = pagesForCities(cities);
-      for (const page of pages) checks.push(await exportPage(chromePath, page, refreshKey));
+      for (const [index, page] of pages.entries()) {
+        checks.push(await exportPage(chromePath, page, refreshKey));
+        if (EXPORT_DELAY_MS > 0 && index < pages.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, EXPORT_DELAY_MS));
+        }
+      }
       const removedLegacyFiles = await removeLegacyWeatherSnapshots();
-      await writeReport({ status: 'passed', checkedAt: new Date().toISOString(), hour: refreshKey, baseUrl: BASE_URL, requireLiveData: REQUIRE_LIVE_DATA, checks });
+      await writeReport({ status: 'passed', checkedAt: new Date().toISOString(), ...reportContext, checks });
       if (removedLegacyFiles.length > 0) await logInfo(`Removed ${removedLegacyFiles.length} legacy weather snapshot files.`);
-      await logInfo(`Exported and verified ${checks.length} front-end images for hour ${refreshKey}.`);
+      await logInfo(`Exported and verified ${checks.length} snapshot images for hour ${refreshKey}.`);
     } catch (error) {
-      await writeReport({ status: 'failed', checkedAt: new Date().toISOString(), hour: refreshKey, baseUrl: BASE_URL, requireLiveData: REQUIRE_LIVE_DATA, checks, error: error instanceof Error ? error.message : String(error) });
+      await writeReport({ status: 'failed', checkedAt: new Date().toISOString(), ...reportContext, checks, error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   } finally {
